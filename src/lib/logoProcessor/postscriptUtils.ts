@@ -1,4 +1,3 @@
-
 // PostScript helper functions for EPS generation
 export const createPostScriptHeader = (width: number, height: number): string => {
   return `%!PS-Adobe-3.0 EPSF-3.0
@@ -247,7 +246,7 @@ export const convertSVGPathToPostScript = (pathData: string): string => {
   }
 };
 
-// Direct SVG to EPS conversion function
+// Direct SVG to EPS conversion function with improvements
 export const directSvgToEps = (svgString: string): string => {
   try {
     console.log('Starting direct SVG to EPS conversion');
@@ -258,6 +257,7 @@ export const directSvgToEps = (svgString: string): string => {
     const svgElement = svgDoc.querySelector('svg');
     
     if (!svgElement) {
+      console.error('Invalid SVG: No SVG element found');
       throw new Error('Invalid SVG: No SVG element found');
     }
     
@@ -285,43 +285,68 @@ export const directSvgToEps = (svgString: string): string => {
     
     // Start building EPS content
     let epsContent = createPostScriptHeader(width, height);
+    let hasContent = false;
     
-    // Process paths
+    // Process paths - the most important element for vectors
     const paths = svgDoc.querySelectorAll('path');
     console.log(`Found ${paths.length} paths in SVG`);
     
     if (paths.length > 0) {
       paths.forEach((path, index) => {
         const d = path.getAttribute('d');
-        const fill = path.getAttribute('fill') || '#000000';
+        if (!d) return;
         
-        if (d) {
-          console.log(`Processing path ${index + 1} with fill ${fill}`);
+        const fill = path.getAttribute('fill') || '#000000';
+        const stroke = path.getAttribute('stroke');
+        const strokeWidth = path.getAttribute('stroke-width');
+        
+        console.log(`Processing path ${index + 1} with fill ${fill}, stroke ${stroke || 'none'}`);
+        
+        // Set fill color
+        if (fill !== 'none') {
+          const rgbValues = hexToRgbForPostScript(fill);
+          epsContent += `${rgbValues} rgb\n`;
+        }
+        
+        // Convert path to PostScript - enhanced version with manual fallback
+        try {
+          epsContent += 'n\n'; // Start a new path
           
-          // Set fill color
-          if (fill !== 'none') {
-            const rgbValues = hexToRgbForPostScript(fill);
-            epsContent += `${rgbValues} rgb\n`;
+          // Try our convertSVGPathToPostScript function first (more robust)
+          const pathCommands = convertSVGPathToPostScript(d);
+          epsContent += pathCommands;
+          
+          // If no commands were generated, try simpler svgPathToPostScript
+          if (!pathCommands || pathCommands.trim() === 'n') {
+            epsContent += svgPathToPostScript(d);
           }
           
-          // Convert path to PostScript
-          epsContent += svgPathToPostScript(d);
-          
-          // Apply fill
+          // Apply appropriate operations based on fill/stroke
           if (fill !== 'none') {
-            epsContent += 'f\n';
+            epsContent += 'cp\nf\n'; // Close path and fill
+            hasContent = true;
+          } else if (stroke) {
+            // Set stroke properties if specified
+            if (strokeWidth) {
+              epsContent += `${parseFloat(strokeWidth) || 1} w\n`;
+            }
+            epsContent += 'cp\ns\n'; // Close path and stroke
+            hasContent = true;
           } else {
-            epsContent += 's\n';
+            epsContent += 'cp\nf\n'; // Default to fill
+            hasContent = true;
           }
+        } catch (e) {
+          console.error(`Error processing path: ${e}`);
+          // Continue processing other paths
         }
       });
-    } else {
-      // Process other SVG elements
-      console.log('No paths found, looking for other SVG elements');
-      
-      // Check for rectangles
+    }
+    
+    // Process rectangles if no paths were found or if processing paths failed
+    if (!hasContent) {
       const rects = svgDoc.querySelectorAll('rect');
-      console.log(`Found ${rects.length} rectangles`);
+      console.log(`Found ${rects.length} rectangles in SVG`);
       
       rects.forEach((rect, index) => {
         const x = parseFloat(rect.getAttribute('x') || '0');
@@ -331,6 +356,8 @@ export const directSvgToEps = (svgString: string): string => {
         const fill = rect.getAttribute('fill') || '#000000';
         
         console.log(`Processing rect ${index + 1} at (${x},${y}) size ${rectWidth}x${rectHeight}`);
+        
+        if (rectWidth <= 0 || rectHeight <= 0) return; // Skip invalid rectangles
         
         // Set fill color
         if (fill !== 'none') {
@@ -348,20 +375,26 @@ export const directSvgToEps = (svgString: string): string => {
         // Apply fill
         if (fill !== 'none') {
           epsContent += 'f\n';
+          hasContent = true;
         } else {
           epsContent += 's\n';
+          hasContent = true;
         }
       });
-      
-      // Check for circles
+    }
+    
+    // Process circles if still no content
+    if (!hasContent) {
       const circles = svgDoc.querySelectorAll('circle');
-      console.log(`Found ${circles.length} circles`);
+      console.log(`Found ${circles.length} circles in SVG`);
       
       circles.forEach((circle, index) => {
         const cx = parseFloat(circle.getAttribute('cx') || '0');
         const cy = parseFloat(circle.getAttribute('cy') || '0');
         const r = parseFloat(circle.getAttribute('r') || '0');
         const fill = circle.getAttribute('fill') || '#000000';
+        
+        if (r <= 0) return; // Skip invalid circles
         
         console.log(`Processing circle ${index + 1} at (${cx},${cy}) radius ${r}`);
         
@@ -390,26 +423,28 @@ export const directSvgToEps = (svgString: string): string => {
         // Apply fill
         if (fill !== 'none') {
           epsContent += 'f\n';
+          hasContent = true;
         } else {
           epsContent += 's\n';
+          hasContent = true;
         }
       });
     }
     
-    // Add a test shape if we didn't generate any content
-    if (!epsContent.includes('cp')) {
-      console.log('No vector content found, adding test shape');
+    // As a last resort, add a clearly visible test shape if we didn't generate any content
+    if (!hasContent) {
+      console.warn('No vector content found, adding test shape');
       epsContent += createTestShape(width, height);
     }
     
     // Add footer
     epsContent += createPostScriptFooter();
     
-    console.log('EPS content generated, length:', epsContent.length);
+    console.log('EPS content generated successfully, size:', epsContent.length, 'bytes');
     return epsContent;
   } catch (error) {
     console.error('Error in direct SVG to EPS conversion:', error);
-    // Return a fallback EPS with a simple shape
+    // Return a fallback EPS with a simple shape that is clearly visible
     return createFallbackEps();
   }
 };
@@ -418,6 +453,21 @@ export const directSvgToEps = (svgString: string): string => {
 const hexToRgbForPostScript = (hex: string): string => {
   // Default to black
   if (!hex || hex === 'none') return '0 0 0';
+  
+  // Handle special case: transparent or none
+  if (hex.toLowerCase() === 'transparent' || hex === 'none') {
+    return '0 0 0';
+  }
+  
+  // Handle special named colors
+  if (hex.toLowerCase() === 'black') return '0 0 0';
+  if (hex.toLowerCase() === 'white') return '1 1 1';
+  if (hex.toLowerCase() === 'red') return '1 0 0';
+  if (hex.toLowerCase() === 'green') return '0 1 0';
+  if (hex.toLowerCase() === 'blue') return '0 0 1';
+  
+  // If not a hex value starting with #, return default black
+  if (!hex.startsWith('#')) return '0 0 0';
   
   // Expand shorthand form (e.g. "03F") to full form (e.g. "0033FF")
   const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
@@ -435,13 +485,35 @@ const hexToRgbForPostScript = (hex: string): string => {
   return `${r.toFixed(3)} ${g.toFixed(3)} ${b.toFixed(3)}`;
 };
 
-// Create a fallback EPS with a simple shape
+// Create a fallback EPS with a visually distinctive shape
 const createFallbackEps = (): string => {
   const width = 400;
   const height = 400;
   
   let content = createPostScriptHeader(width, height);
-  content += createTestShape(width, height);
+  
+  // Add a visually distinctive shape that will be obvious when opened
+  content += `
+% Fallback shape - clearly visible logo placeholder
+n
+200 300 m
+300 200 l
+200 100 l
+100 200 l
+cp
+0 0 0 rgb
+f
+
+n
+200 250 m
+250 200 l
+200 150 l
+150 200 l
+cp
+1 1 1 rgb
+f
+`;
+  
   content += createPostScriptFooter();
   
   return content;
