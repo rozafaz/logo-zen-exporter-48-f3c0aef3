@@ -1,4 +1,3 @@
-
 import JSZip from 'jszip';
 import { PDFDocument } from 'pdf-lib';
 import type { ExportSettings } from '@/components/ExportOptions';
@@ -8,6 +7,17 @@ interface ProcessedFile {
   filename: string;
   data: Blob;
 }
+
+// Helper function to convert SVG path commands to PostScript - moved to top level
+const convertSvgPathToPostScript = (svgPath: string): string => {
+  // Basic conversion of SVG path commands to PostScript
+  return svgPath
+    .replace(/([ML])\s*([0-9.-]+)[,\s]([0-9.-]+)/g, (_, cmd, x, y) => 
+      cmd === 'M' ? `${x} ${y} m\n` : `${x} ${y} l\n`)
+    .replace(/Z/gi, 'h\n')
+    .replace(/([C])\s*([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)/g, 
+      (_, __, x1, y1, x2, y2, x, y) => `${x1} ${y1} ${x2} ${y2} ${x} ${y} c\n`);
+};
 
 // Create PDF from image data
 const createPdfFromImage = async (pngDataUrl: string): Promise<Blob> => {
@@ -93,15 +103,121 @@ const createEpsFromSvg = (svgString: string): Blob => {
   }
 };
 
-// Helper function to convert SVG path commands to PostScript
-const convertSvgPathToPostScript = (svgPath: string): string => {
-  // Basic conversion of SVG path commands to PostScript
-  return svgPath
-    .replace(/([ML])\s*([0-9.-]+)[,\s]([0-9.-]+)/g, (_, cmd, x, y) => 
-      cmd === 'M' ? `${x} ${y} m\n` : `${x} ${y} l\n`)
-    .replace(/Z/gi, 'h\n')
-    .replace(/([C])\s*([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)/g, 
-      (_, __, x1, y1, x2, y2, x, y) => `${x1} ${y1} ${x2} ${y2} ${x} ${y} c\n`);
+// Function to export a test ZIP file for development testing
+export const testZipDownload = () => {
+  const zip = new JSZip();
+  zip.file("test.txt", "This is a test file");
+  
+  zip.generateAsync({ type: "blob" })
+    .then(blob => {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'test.zip';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    });
+};
+
+// Helper to modify SVG colors - simplified version
+const modifySvgColor = (svgString: string, color: string): string => {
+  // This is a basic implementation that works for simple SVGs
+  // A production app would use a proper SVG parser
+  return svgString.replace(/fill="[^"]*"/g, `fill="${color}"`)
+                .replace(/stroke="[^"]*"/g, `stroke="${color}"`);
+};
+
+// Helper to invert SVG colors (simplified version)
+const invertSvgColors = (svgText: string): string => {
+  // This is a simplified approach - in production, you'd use a proper SVG parser
+  return svgText.replace(
+    /fill="(#[0-9A-Fa-f]{6})"/g, 
+    (match, color) => `fill="${invertHexColor(color)}"`
+  ).replace(
+    /stroke="(#[0-9A-Fa-f]{6})"/g, 
+    (match, color) => `stroke="${invertHexColor(color)}"`
+  );
+};
+
+// Helper to invert a hex color
+const invertHexColor = (hex: string): string => {
+  // Remove # if present
+  hex = hex.replace('#', '');
+  
+  // Convert to RGB
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  
+  // Invert colors
+  const invertedR = (255 - r).toString(16).padStart(2, '0');
+  const invertedG = (255 - g).toString(16).padStart(2, '0');
+  const invertedB = (255 - b).toString(16).padStart(2, '0');
+  
+  return `#${invertedR}${invertedG}${invertedB}`;
+};
+
+const applyBlackFilter = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+  
+  for (let i = 0; i < data.length; i += 4) {
+    const alpha = data[i + 3];
+    if (alpha > 0) {
+      data[i] = 0;     // R
+      data[i + 1] = 0; // G
+      data[i + 2] = 0; // B
+    }
+  }
+  
+  ctx.putImageData(imageData, 0, 0);
+};
+
+const applyWhiteFilter = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+  
+  for (let i = 0; i < data.length; i += 4) {
+    const alpha = data[i + 3];
+    if (alpha > 0) {
+      data[i] = 255;     // R
+      data[i + 1] = 255; // G
+      data[i + 2] = 255; // B
+    }
+  }
+  
+  ctx.putImageData(imageData, 0, 0);
+};
+
+const applyGrayscaleFilter = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+  
+  for (let i = 0; i < data.length; i += 4) {
+    const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+    data[i] = avg;     // R
+    data[i + 1] = avg; // G
+    data[i + 2] = avg; // B
+    // Alpha stays the same
+  }
+  
+  ctx.putImageData(imageData, 0, 0);
+};
+
+const applyInvertedFilter = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+  
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = 255 - data[i];         // R
+    data[i + 1] = 255 - data[i + 1]; // G
+    data[i + 2] = 255 - data[i + 2]; // B
+    // Alpha stays the same
+  }
+  
+  ctx.putImageData(imageData, 0, 0);
 };
 
 export const processLogo = async (
@@ -352,7 +468,7 @@ export const processLogo = async (
               if (formats.includes('EPS')) {
                 try {
                   // For client-side, we generate a simple EPS with metadata that points to the PDF
-                  const epsBlob = await createEpsFromPdf(modifiedSvg);
+                  const epsBlob = await createEpsFromPdf(svgText);
                   
                   const epsFolder = 'EPS';
                   files.push({
@@ -631,17 +747,6 @@ const createEpsFromPdf = async (svgString: string): Promise<Blob> => {
   }
 };
 
-// Helper function to convert SVG path commands to PostScript
-const convertSvgPathToPostScript = (svgPath: string): string => {
-  // Basic conversion of SVG path commands to PostScript
-  return svgPath
-    .replace(/([ML])\s*([0-9.-]+)[,\s]([0-9.-]+)/g, (_, cmd, x, y) => 
-      cmd === 'M' ? `${x} ${y} m\n` : `${x} ${y} l\n`)
-    .replace(/Z/gi, 'h\n')
-    .replace(/([C])\s*([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)/g, 
-      (_, __, x1, y1, x2, y2, x, y) => `${x1} ${y1} ${x2} ${y2} ${x} ${y} c\n`);
-};
-
 // Helper function to generate EPS path instructions
 const generateEPSPaths = (): string => {
   // Generate a simple shape as a fallback
@@ -656,105 +761,6 @@ const generateEPSPaths = (): string => {
     0.5 setgray
     fill
   `;
-};
-
-// Helper to modify SVG colors - simplified version
-const modifySvgColor = (svgText: string, color: string): string => {
-  // This is a basic implementation that works for simple SVGs
-  // A production app would use a proper SVG parser
-  return svgText.replace(/fill="[^"]*"/g, `fill="${color}"`)
-                .replace(/stroke="[^"]*"/g, `stroke="${color}"`);
-};
-
-// Helper to invert SVG colors (simplified version)
-const invertSvgColors = (svgText: string): string => {
-  // This is a simplified approach - in production, you'd use a proper SVG parser
-  return svgText.replace(
-    /fill="(#[0-9A-Fa-f]{6})"/g, 
-    (match, color) => `fill="${invertHexColor(color)}"`
-  ).replace(
-    /stroke="(#[0-9A-Fa-f]{6})"/g, 
-    (match, color) => `stroke="${invertHexColor(color)}"`
-  );
-};
-
-// Helper to invert a hex color
-const invertHexColor = (hex: string): string => {
-  // Remove # if present
-  hex = hex.replace('#', '');
-  
-  // Convert to RGB
-  const r = parseInt(hex.substring(0, 2), 16);
-  const g = parseInt(hex.substring(2, 4), 16);
-  const b = parseInt(hex.substring(4, 6), 16);
-  
-  // Invert colors
-  const invertedR = (255 - r).toString(16).padStart(2, '0');
-  const invertedG = (255 - g).toString(16).padStart(2, '0');
-  const invertedB = (255 - b).toString(16).padStart(2, '0');
-  
-  return `#${invertedR}${invertedG}${invertedB}`;
-};
-
-const applyBlackFilter = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
-  const imageData = ctx.getImageData(0, 0, width, height);
-  const data = imageData.data;
-  
-  for (let i = 0; i < data.length; i += 4) {
-    const alpha = data[i + 3];
-    if (alpha > 0) {
-      data[i] = 0;     // R
-      data[i + 1] = 0; // G
-      data[i + 2] = 0; // B
-    }
-  }
-  
-  ctx.putImageData(imageData, 0, 0);
-};
-
-const applyWhiteFilter = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
-  const imageData = ctx.getImageData(0, 0, width, height);
-  const data = imageData.data;
-  
-  for (let i = 0; i < data.length; i += 4) {
-    const alpha = data[i + 3];
-    if (alpha > 0) {
-      data[i] = 255;     // R
-      data[i + 1] = 255; // G
-      data[i + 2] = 255; // B
-    }
-  }
-  
-  ctx.putImageData(imageData, 0, 0);
-};
-
-const applyGrayscaleFilter = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
-  const imageData = ctx.getImageData(0, 0, width, height);
-  const data = imageData.data;
-  
-  for (let i = 0; i < data.length; i += 4) {
-    const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-    data[i] = avg;     // R
-    data[i + 1] = avg; // G
-    data[i + 2] = avg; // B
-    // Alpha stays the same
-  }
-  
-  ctx.putImageData(imageData, 0, 0);
-};
-
-const applyInvertedFilter = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
-  const imageData = ctx.getImageData(0, 0, width, height);
-  const data = imageData.data;
-  
-  for (let i = 0; i < data.length; i += 4) {
-    data[i] = 255 - data[i];         // R
-    data[i + 1] = 255 - data[i + 1]; // G
-    data[i + 2] = 255 - data[i + 2]; // B
-    // Alpha stays the same
-  }
-  
-  ctx.putImageData(imageData, 0, 0);
 };
 
 export const createZipPackage = async (files: ProcessedFile[]): Promise<Blob> => {
