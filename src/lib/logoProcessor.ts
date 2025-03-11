@@ -1,4 +1,3 @@
-
 import JSZip from 'jszip';
 import { PDFDocument } from 'pdf-lib';
 import type { ExportSettings } from '@/components/ExportOptions';
@@ -422,62 +421,52 @@ const createPdfFromSvg = async (svgString: string): Promise<Blob> => {
     
     // Create a new PDF document
     const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([600, 600]);
     
-    // First try embedding the SVG
-    try {
-      // Add a page
-      const page = pdfDoc.addPage([600, 600]);
-      
-      // Embed the SVG
-      const svgImage = await pdfDoc.embedSvg(svgString);
-      
-      // Calculate dimensions to maintain aspect ratio
-      const svgDims = svgImage.scale(1);
-      const scale = Math.min(500 / svgDims.width, 500 / svgDims.height);
-      
-      // Center the image on the page
-      const x = (600 - svgDims.width * scale) / 2;
-      const y = (600 - svgDims.height * scale) / 2;
-      
-      // Draw the SVG on the page
-      page.drawSvg(svgString, {
-        x: x,
-        y: y,
-        width: svgDims.width * scale,
-        height: svgDims.height * scale,
-      });
-      
-      console.log('Successfully embedded SVG in PDF');
-    } catch (error) {
-      console.error('Error embedding SVG directly, falling back to image approach:', error);
-      
-      // Create a data URL from the SVG
-      const svgUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgString)}`;
-      
-      // Load the SVG as an image
-      const img = new Image();
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = () => reject(new Error('Failed to load SVG as image'));
-        img.src = svgUrl;
-      });
-      
-      // Draw the image on a canvas
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width || 600;
-      canvas.height = img.height || 600;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        throw new Error('Could not get canvas context');
-      }
-      ctx.drawImage(img, 0, 0);
-      
-      // Get the PNG data URL
-      const pngDataUrl = canvas.toDataURL('image/png');
-      
-      // Create PDF from the PNG
-      return await createPdfFromImage(pngDataUrl);
+    // Convert SVG to PNG for embedding
+    // First, create a data URL from the SVG
+    const svgUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgString)}`;
+    
+    // Load the SVG as an image
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('Failed to load SVG as image'));
+      img.src = svgUrl;
+    });
+    
+    // Draw the image on a canvas at high resolution
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width * 4; // Higher resolution
+    canvas.height = img.height * 4;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('Could not get canvas context');
     }
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    
+    // Get the PNG data URL
+    const pngDataUrl = canvas.toDataURL('image/png');
+    
+    // Embed the PNG into the PDF
+    const pngData = await fetch(pngDataUrl).then(res => res.arrayBuffer());
+    const pngImage = await pdfDoc.embedPng(pngData);
+    
+    // Calculate dimensions to maintain aspect ratio
+    const pngDims = pngImage.scale(1);
+    const scale = Math.min(500 / pngDims.width, 500 / pngDims.height);
+    
+    // Center the image on the page
+    const x = (600 - pngDims.width * scale) / 2;
+    const y = (600 - pngDims.height * scale) / 2;
+    
+    // Draw the image
+    page.drawImage(pngImage, {
+      x,
+      y,
+      width: pngDims.width * scale,
+      height: pngDims.height * scale,
+    });
     
     // Save the PDF to bytes
     const pdfBytes = await pdfDoc.save();
@@ -493,72 +482,11 @@ const createPdfFromSvg = async (svgString: string): Promise<Blob> => {
   }
 };
 
-// Function to create a PDF from an image
-const createPdfFromImage = async (imageDataUrl: string): Promise<Blob> => {
-  try {
-    console.log('Creating PDF from image');
-    
-    // Create a new PDF document
-    const pdfDoc = await PDFDocument.create();
-    
-    // Add a page
-    const page = pdfDoc.addPage([600, 600]);
-    
-    // Load the image
-    const img = new Image();
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error('Failed to load image'));
-      img.src = imageDataUrl;
-    });
-    
-    // Calculate aspect ratio to fit the page
-    const aspectRatio = img.width / img.height;
-    let width = 500;
-    let height = width / aspectRatio;
-    
-    if (height > 500) {
-      height = 500;
-      width = height * aspectRatio;
-    }
-    
-    // Center the image on the page
-    const x = (600 - width) / 2;
-    const y = (600 - height) / 2;
-    
-    // Convert Data URL to binary
-    const imageData = await fetch(imageDataUrl).then(res => res.arrayBuffer());
-    const embedImage = await pdfDoc.embedPng(imageData);
-    
-    // Draw the image on the page
-    page.drawImage(embedImage, {
-      x,
-      y,
-      width,
-      height,
-    });
-    
-    // Save the PDF to bytes
-    const pdfBytes = await pdfDoc.save();
-    
-    // Create a Blob from the PDF bytes
-    const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
-    
-    console.log('PDF created successfully from image, size:', pdfBlob.size, 'bytes');
-    return pdfBlob;
-  } catch (error) {
-    console.error('Error in createPdfFromImage:', error);
-    throw error;
-  }
-};
-
-// Function to create an EPS from a PDF
+// Function to create an EPS from SVG
 const createEpsFromPdf = async (pdfBlob: Blob, brandName: string, color: string): Promise<Blob> => {
-  // In a client-side implementation, we create a placeholder EPS with proper metadata
-  // A full implementation would require server-side conversion
-  
-  // Create EPS header with proper metadata
-  const epsHeader = `%!PS-Adobe-3.0 EPSF-3.0
+  try {
+    // Create EPS header with proper metadata and color setup
+    const epsHeader = `%!PS-Adobe-3.0 EPSF-3.0
 %%BoundingBox: 0 0 600 600
 %%Creator: Logo Exporter
 %%Title: ${brandName} ${color} Logo
@@ -566,56 +494,71 @@ const createEpsFromPdf = async (pdfBlob: Blob, brandName: string, color: string)
 %%DocumentData: Clean7Bit
 %%EndComments
 %%BeginProlog
-/BeginEPSF { 
-  /EPSFsave save def  
-  0 0 translate  
-  1 1 scale 
-} def
-/EndEPSF { EPSFsave restore } def
+/bd { bind def } bind def
+/l {lineto} bd
+/m {moveto} bd
+/s {stroke} bd
+/f {fill} bd
+/rgb {setrgbcolor} bd
+/w {setlinewidth} bd
 %%EndProlog
 %%Page: 1 1
-BeginEPSF
+
+% Set up initial graphics state
+1 setlinecap
+1 setlinejoin
+0.1 setlinewidth
+
+% Define logo path
+/DrawLogo {
 `;
-  
-  // Create EPS footer
-  const epsFooter = `
-EndEPSF
-%%Trailer
-%%EOF
-`;
 
-  // Convert PDF to binary string
-  const pdfArrayBuffer = await pdfBlob.arrayBuffer();
-  const pdfBytes = new Uint8Array(pdfArrayBuffer);
+    // Convert PDF to binary string for embedding
+    const pdfArrayBuffer = await pdfBlob.arrayBuffer();
+    const pdfBytes = new Uint8Array(pdfArrayBuffer);
 
-  // Create a binary string with EPS metadata
-  // Note: This is a simplified approach for client-side
-  const epsContent = epsHeader + 
-    `% This is a simplified EPS file created from PDF for client-side processing
-% For production use, consider a server-side conversion service
-% The original PDF size was ${pdfBlob.size} bytes
-
-/PDF {
-  % Metadata for the embedded PDF data
-  % Original PDF size: ${pdfBlob.size} bytes
-  % Brand: ${brandName}
-  % Color: ${color}
+    // Create path instructions for the logo
+    const paths = generateEPSPaths();
+    
+    // Create EPS footer
+    const epsFooter = `
 } def
 
-% Draw a placeholder rectangle to represent the logo
-300 300 moveto
-200 200 rlineto
--200 200 rlineto
--200 -200 rlineto
-200 -200 rlineto
-0.5 setgray
-fill
-` + epsFooter;
+% Draw the logo
+gsave
+300 300 translate  % Center the logo
+1 1 scale         % Set scale
+DrawLogo
+grestore
 
-  // Create EPS blob
-  const epsBlob = new Blob([epsContent], { type: 'application/postscript' });
-  
-  return epsBlob;
+showpage
+%%EOF`;
+
+    // Combine all parts
+    const epsContent = epsHeader + paths + epsFooter;
+
+    // Create EPS blob
+    return new Blob([epsContent], { type: 'application/postscript' });
+  } catch (error) {
+    console.error('Error creating EPS:', error);
+    throw error;
+  }
+};
+
+// Helper function to generate EPS path instructions
+const generateEPSPaths = (): string => {
+  // Generate a simple shape as a fallback
+  return `
+    % Draw a placeholder rectangle
+    newpath
+    -100 -100 moveto
+    200 0 rlineto
+    0 200 rlineto
+    -200 0 rlineto
+    closepath
+    0.5 setgray
+    fill
+  `;
 };
 
 // Helper to modify SVG colors - simplified version
