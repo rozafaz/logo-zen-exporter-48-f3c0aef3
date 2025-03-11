@@ -94,7 +94,7 @@ export const processLogo = async (
     throw error;
   } finally {
     // Clean up
-    URL.revoObjectURL(logoUrl);
+    URL.revokeObjectURL(logoUrl);
   }
   
   console.log(`Processing complete. Generated ${files.length} files.`);
