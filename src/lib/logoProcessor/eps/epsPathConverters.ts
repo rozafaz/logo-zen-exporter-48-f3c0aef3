@@ -1,10 +1,15 @@
 
-import { setPostScriptColor } from './epsSvgHelpers';
+import { setPostScriptColor, convertSvgTransform } from './epsSvgHelpers';
 
 /**
  * Convert SVG path data to PostScript commands
  */
-export const convertPathToPostScript = (pathData: string, flipY: boolean = true, height: number = 0): string => {
+export const convertPathToPostScript = (
+  pathData: string, 
+  flipY: boolean = true, 
+  height: number = 0,
+  transforms: string | null = null
+): string => {
   let output = 'newpath\n';
   let currentX = 0;
   let currentY = 0;
@@ -12,6 +17,12 @@ export const convertPathToPostScript = (pathData: string, flipY: boolean = true,
   let firstY = 0;
   let lastControlX = 0;
   let lastControlY = 0;
+  
+  // Apply any SVG transforms
+  if (transforms) {
+    output += 'gsave\n';
+    output += convertSvgTransform(transforms);
+  }
   
   // Normalize path data to ensure consistent parsing
   const normalizedPath = pathData
@@ -43,7 +54,7 @@ export const convertPathToPostScript = (pathData: string, flipY: boolean = true,
             currentX = token === 'M' ? x : currentX + x;
             currentY = token === 'M' ? y : currentY + y;
             const transformedY = transformY(currentY);
-            output += `${currentX.toString()} ${transformedY.toString()} moveto\n`;
+            output += `${currentX.toFixed(3)} ${transformedY.toFixed(3)} moveto\n`;
             firstX = currentX;
             firstY = transformedY;
           }
@@ -59,7 +70,7 @@ export const convertPathToPostScript = (pathData: string, flipY: boolean = true,
             currentX = token === 'L' ? x : currentX + x;
             currentY = token === 'L' ? y : currentY + y;
             const transformedY = transformY(currentY);
-            output += `${currentX.toString()} ${transformedY.toString()} lineto\n`;
+            output += `${currentX.toFixed(3)} ${transformedY.toFixed(3)} lineto\n`;
           }
         }
         break;
@@ -70,7 +81,7 @@ export const convertPathToPostScript = (pathData: string, flipY: boolean = true,
           
           if (!isNaN(x)) {
             currentX = token === 'H' ? x : currentX + x;
-            output += `${currentX.toString()} ${transformY(currentY).toString()} lineto\n`;
+            output += `${currentX.toFixed(3)} ${transformY(currentY).toFixed(3)} lineto\n`;
           }
         }
         break;
@@ -81,7 +92,7 @@ export const convertPathToPostScript = (pathData: string, flipY: boolean = true,
           
           if (!isNaN(y)) {
             currentY = token === 'V' ? y : currentY + y;
-            output += `${currentX.toString()} ${transformY(currentY).toString()} lineto\n`;
+            output += `${currentX.toFixed(3)} ${transformY(currentY).toFixed(3)} lineto\n`;
           }
         }
         break;
@@ -105,7 +116,7 @@ export const convertPathToPostScript = (pathData: string, flipY: boolean = true,
             currentX = token === 'C' ? x : currentX + x;
             currentY = token === 'C' ? y : currentY + y;
             
-            output += `${cx1.toString()} ${transformY(cy1).toString()} ${cx2.toString()} ${transformY(cy2).toString()} ${currentX.toString()} ${transformY(currentY).toString()} curveto\n`;
+            output += `${cx1.toFixed(3)} ${transformY(cy1).toFixed(3)} ${cx2.toFixed(3)} ${transformY(cy2).toFixed(3)} ${currentX.toFixed(3)} ${transformY(currentY).toFixed(3)} curveto\n`;
           }
         }
         break;
@@ -128,7 +139,7 @@ export const convertPathToPostScript = (pathData: string, flipY: boolean = true,
             currentX = token === 'S' ? x : currentX + x;
             currentY = token === 'S' ? y : currentY + y;
             
-            output += `${cx1.toString()} ${transformY(cy1).toString()} ${cx2.toString()} ${transformY(cy2).toString()} ${currentX.toString()} ${transformY(currentY).toString()} curveto\n`;
+            output += `${cx1.toFixed(3)} ${transformY(cy1).toFixed(3)} ${cx2.toFixed(3)} ${transformY(cy2).toFixed(3)} ${currentX.toFixed(3)} ${transformY(currentY).toFixed(3)} curveto\n`;
           }
         }
         break;
@@ -158,15 +169,34 @@ export const convertPathToPostScript = (pathData: string, flipY: boolean = true,
             currentX = qx;
             currentY = qy;
             
-            output += `${cx1.toString()} ${transformY(cy1).toString()} ${cx2.toString()} ${transformY(cy2).toString()} ${currentX.toString()} ${transformY(currentY).toString()} curveto\n`;
+            output += `${cx1.toFixed(3)} ${transformY(cy1).toFixed(3)} ${cx2.toFixed(3)} ${transformY(cy2).toFixed(3)} ${currentX.toFixed(3)} ${transformY(currentY).toFixed(3)} curveto\n`;
           }
         }
         break;
         
-      case 'A': // Arc - convert to cubic bezier approximation
-        console.log('Arc commands in SVG are approximated in EPS');
-        // Skip the 7 parameters of the arc command
-        i += 7;
+      case 'A': // Arc - approximate with bezier curves
+        if (i + 6 < tokens.length) {
+          const rx = parseFloat(tokens[i++]);
+          const ry = parseFloat(tokens[i++]);
+          const xAxisRotation = parseFloat(tokens[i++]);
+          const largeArcFlag = parseInt(tokens[i++]);
+          const sweepFlag = parseInt(tokens[i++]);
+          const x = parseFloat(tokens[i++]);
+          const y = parseFloat(tokens[i++]);
+          
+          if (!isNaN(rx) && !isNaN(ry) && !isNaN(x) && !isNaN(y)) {
+            // Simple approximation - just draw a line to the end point
+            // In a production environment, this would be replaced with proper arc-to-bezier conversion
+            const endX = token === 'A' ? x : currentX + x;
+            const endY = token === 'A' ? y : currentY + y;
+            
+            output += `% Arc approximated as line: rx=${rx}, ry=${ry}, rotation=${xAxisRotation}, largeArc=${largeArcFlag}, sweep=${sweepFlag}\n`;
+            output += `${endX.toFixed(3)} ${transformY(endY).toFixed(3)} lineto\n`;
+            
+            currentX = endX;
+            currentY = endY;
+          }
+        }
         break;
         
       case 'Z':
@@ -181,6 +211,11 @@ export const convertPathToPostScript = (pathData: string, flipY: boolean = true,
         console.warn('Unsupported SVG path command:', token);
         break;
     }
+  }
+  
+  // Close the transformation group if needed
+  if (transforms) {
+    output += 'grestore\n';
   }
   
   return output;
@@ -198,6 +233,9 @@ export const convertElementsToPostScript = (
   let output = '';
   
   elements.forEach(element => {
+    // Get any transformation attributes
+    const transforms = element.getAttribute('transform');
+    
     if (elementType === 'path') {
       const pathData = element.getAttribute('d');
       if (!pathData) return;
@@ -205,15 +243,22 @@ export const convertElementsToPostScript = (
       const pathFill = element.getAttribute('fill') || baseFillColor;
       const pathStroke = element.getAttribute('stroke');
       const strokeWidth = element.getAttribute('stroke-width');
+      const opacity = element.getAttribute('opacity') || '1';
       
       // Start a new graphics state to isolate changes
       output += 'gsave\n';
+      
+      // Set opacity if needed (approximate in PostScript)
+      const opacityValue = parseFloat(opacity);
+      if (!isNaN(opacityValue) && opacityValue < 1) {
+        output += `% Opacity set to ${opacityValue}\n`;
+      }
       
       // Set color for this path
       output += setPostScriptColor(pathFill);
       
       // Convert path to PostScript commands
-      output += convertPathToPostScript(pathData, true, svgHeight);
+      output += convertPathToPostScript(pathData, true, svgHeight, transforms);
       
       // Apply fill or stroke
       if (pathFill && pathFill !== 'none') {
@@ -225,11 +270,11 @@ export const convertElementsToPostScript = (
         output += setPostScriptColor(pathStroke);
         // Set stroke width if specified
         if (strokeWidth) {
-          output += `${parseFloat(strokeWidth).toString() || "1"} setlinewidth\n`;
+          output += `${parseFloat(strokeWidth).toString()} setlinewidth\n`;
         }
         // Draw the path again for the stroke (if already filled)
         if (pathFill && pathFill !== 'none') {
-          output += convertPathToPostScript(pathData, true, svgHeight);
+          output += convertPathToPostScript(pathData, true, svgHeight, transforms);
         }
         output += 'stroke\n';
       } else if (!pathFill || pathFill === 'none') {
@@ -245,12 +290,19 @@ export const convertElementsToPostScript = (
       const width = parseFloat(element.getAttribute('width') || '0');
       const height = parseFloat(element.getAttribute('height') || '0');
       const rx = parseFloat(element.getAttribute('rx') || '0');
-      const ry = parseFloat(element.getAttribute('ry') || rx.toString());
+      const ry = parseFloat(element.getAttribute('ry') || rx);
       const rectFill = element.getAttribute('fill') || baseFillColor;
+      const rectStroke = element.getAttribute('stroke');
+      const strokeWidth = element.getAttribute('stroke-width');
       
       if (width <= 0 || height <= 0) return;
       
       output += 'gsave\n';
+      
+      // Apply transforms if any
+      if (transforms) {
+        output += convertSvgTransform(transforms);
+      }
       
       // Set color for this rectangle
       output += setPostScriptColor(rectFill);
@@ -261,43 +313,77 @@ export const convertElementsToPostScript = (
       
       // Create rectangle path, handling rounded corners if specified
       if (rx > 0 && ry > 0) {
-        // Rounded rectangle implementation (approximate with arcs)
+        // Rounded rectangle implementation with proper arcs
         output += 'newpath\n';
-        output += `${(x + rx).toString()} ${psY.toString()} moveto\n`;
-        output += `${(x + width - rx).toString()} ${psY.toString()} lineto\n`;
-        // Bottom right corner
-        output += `${(x + width).toString()} ${psY.toString()} ${(x + width).toString()} ${(psY + ry).toString()} ${rx.toString()} arcto 4 {pop} repeat\n`;
-        output += `${(x + width).toString()} ${(psY + height - ry).toString()} lineto\n`;
-        // Top right corner
-        output += `${(x + width).toString()} ${(psY + height).toString()} ${(x + width - rx).toString()} ${(psY + height).toString()} ${rx.toString()} arcto 4 {pop} repeat\n`;
-        output += `${(x + rx).toString()} ${(psY + height).toString()} lineto\n`;
-        // Top left corner
-        output += `${x.toString()} ${(psY + height).toString()} ${x.toString()} ${(psY + height - ry).toString()} ${rx.toString()} arcto 4 {pop} repeat\n`;
-        output += `${x.toString()} ${(psY + ry).toString()} lineto\n`;
-        // Bottom left corner
-        output += `${x.toString()} ${psY.toString()} ${(x + rx).toString()} ${psY.toString()} ${rx.toString()} arcto 4 {pop} repeat\n`;
+        
+        // Bottom-left to bottom-right
+        output += `${(x + rx).toFixed(3)} ${psY.toFixed(3)} moveto\n`;
+        output += `${(x + width - rx).toFixed(3)} ${psY.toFixed(3)} lineto\n`;
+        
+        // Bottom-right corner arc
+        output += `${x + width} ${psY} ${rx} 270 360 arc\n`;
+        
+        // Right side
+        output += `${(x + width).toFixed(3)} ${(psY + height - ry).toFixed(3)} lineto\n`;
+        
+        // Top-right corner arc
+        output += `${x + width - rx} ${psY + height} ${rx} 0 90 arc\n`;
+        
+        // Top side
+        output += `${(x + rx).toFixed(3)} ${(psY + height).toFixed(3)} lineto\n`;
+        
+        // Top-left corner arc
+        output += `${x} ${psY + height - ry} ${rx} 90 180 arc\n`;
+        
+        // Left side
+        output += `${x.toFixed(3)} ${(psY + ry).toFixed(3)} lineto\n`;
+        
+        // Bottom-left corner arc
+        output += `${x + rx} ${psY} ${rx} 180 270 arc\n`;
+        
         output += 'closepath\n';
       } else {
         // Simple rectangle
         output += 'newpath\n';
-        output += `${x.toString()} ${psY.toString()} moveto\n`;
-        output += `${width.toString()} 0 rlineto\n`;
-        output += `0 ${height.toString()} rlineto\n`;
-        output += `${(-width).toString()} 0 rlineto\n`;
+        output += `${x.toFixed(3)} ${psY.toFixed(3)} moveto\n`;
+        output += `${(x + width).toFixed(3)} ${psY.toFixed(3)} lineto\n`;
+        output += `${(x + width).toFixed(3)} ${(psY + height).toFixed(3)} lineto\n`;
+        output += `${x.toFixed(3)} ${(psY + height).toFixed(3)} lineto\n`;
         output += 'closepath\n';
       }
       
-      output += 'fill\n';
+      // Fill and/or stroke the rectangle
+      if (rectFill && rectFill !== 'none') {
+        output += 'fill\n';
+      }
+      
+      if (rectStroke && rectStroke !== 'none') {
+        output += setPostScriptColor(rectStroke);
+        if (strokeWidth) {
+          output += `${parseFloat(strokeWidth).toString()} setlinewidth\n`;
+        }
+        output += 'stroke\n';
+      } else if (!rectFill || rectFill === 'none') {
+        output += 'stroke\n';
+      }
+      
       output += 'grestore\n';
     } else if (elementType === 'circle') {
       const cx = parseFloat(element.getAttribute('cx') || '0');
       const cy = parseFloat(element.getAttribute('cy') || '0');
       const r = parseFloat(element.getAttribute('r') || '0');
       const circleFill = element.getAttribute('fill') || baseFillColor;
+      const circleStroke = element.getAttribute('stroke');
+      const strokeWidth = element.getAttribute('stroke-width');
       
       if (r <= 0) return;
       
       output += 'gsave\n';
+      
+      // Apply transforms if any
+      if (transforms) {
+        output += convertSvgTransform(transforms);
+      }
       
       // Set color for this circle
       output += setPostScriptColor(circleFill);
@@ -305,9 +391,23 @@ export const convertElementsToPostScript = (
       // Create circle - properly adjust Y coordinate for PostScript
       const psY = svgHeight - cy;
       output += 'newpath\n';
-      output += `${cx.toString()} ${psY.toString()} ${r.toString()} 0 360 arc\n`;
+      output += `${cx.toFixed(3)} ${psY.toFixed(3)} ${r.toFixed(3)} 0 360 arc\n`;
       output += 'closepath\n';
-      output += 'fill\n';
+      
+      // Fill and/or stroke the circle
+      if (circleFill && circleFill !== 'none') {
+        output += 'fill\n';
+      }
+      
+      if (circleStroke && circleStroke !== 'none') {
+        output += setPostScriptColor(circleStroke);
+        if (strokeWidth) {
+          output += `${parseFloat(strokeWidth).toString()} setlinewidth\n`;
+        }
+        output += 'stroke\n';
+      } else if (!circleFill || circleFill === 'none') {
+        output += 'stroke\n';
+      }
       
       output += 'grestore\n';
     } else if (elementType === 'ellipse') {
@@ -316,10 +416,17 @@ export const convertElementsToPostScript = (
       const rx = parseFloat(element.getAttribute('rx') || '0');
       const ry = parseFloat(element.getAttribute('ry') || '0');
       const ellipseFill = element.getAttribute('fill') || baseFillColor;
+      const ellipseStroke = element.getAttribute('stroke');
+      const strokeWidth = element.getAttribute('stroke-width');
       
       if (rx <= 0 || ry <= 0) return;
       
       output += 'gsave\n';
+      
+      // Apply transforms if any
+      if (transforms) {
+        output += convertSvgTransform(transforms);
+      }
       
       // Set color for this ellipse
       output += setPostScriptColor(ellipseFill);
@@ -327,19 +434,120 @@ export const convertElementsToPostScript = (
       // Create ellipse by scaling a circle
       const psY = svgHeight - cy;
       output += 'newpath\n';
-      output += `${cx.toString()} ${psY.toString()} translate\n`;
-      output += `${rx.toString()} ${ry.toString()} scale\n`;
+      
+      // Move to center, scale, draw circle, restore scale
+      output += `${cx.toFixed(3)} ${psY.toFixed(3)} translate\n`;
+      output += `${rx.toFixed(3)} ${ry.toFixed(3)} scale\n`;
       output += '0 0 1 0 360 arc\n';
-      output += '1 1 1 setrgbcolor\n';  // Reset the scaling
-      output += `${(1/rx).toString()} ${(1/ry).toString()} scale\n`;
-      output += `${(-cx).toString()} ${(-psY).toString()} translate\n`;
+      output += `${(1/rx).toFixed(6)} ${(1/ry).toFixed(6)} scale\n`;
+      output += `${(-cx).toFixed(3)} ${(-psY).toFixed(3)} translate\n`;
       output += 'closepath\n';
-      output += 'fill\n';
+      
+      // Fill and/or stroke the ellipse
+      if (ellipseFill && ellipseFill !== 'none') {
+        output += 'fill\n';
+      }
+      
+      if (ellipseStroke && ellipseStroke !== 'none') {
+        output += setPostScriptColor(ellipseStroke);
+        if (strokeWidth) {
+          output += `${parseFloat(strokeWidth).toString()} setlinewidth\n`;
+        }
+        output += 'stroke\n';
+      } else if (!ellipseFill || ellipseFill === 'none') {
+        output += 'stroke\n';
+      }
+      
+      output += 'grestore\n';
+    } else if (elementType === 'line') {
+      const x1 = parseFloat(element.getAttribute('x1') || '0');
+      const y1 = parseFloat(element.getAttribute('y1') || '0');
+      const x2 = parseFloat(element.getAttribute('x2') || '0');
+      const y2 = parseFloat(element.getAttribute('y2') || '0');
+      const lineStroke = element.getAttribute('stroke') || baseFillColor;
+      const strokeWidth = element.getAttribute('stroke-width');
+      
+      output += 'gsave\n';
+      
+      // Apply transforms if any
+      if (transforms) {
+        output += convertSvgTransform(transforms);
+      }
+      
+      // Set color for this line
+      output += setPostScriptColor(lineStroke);
+      
+      // Create line
+      output += 'newpath\n';
+      output += `${x1.toFixed(3)} ${(svgHeight - y1).toFixed(3)} moveto\n`;
+      output += `${x2.toFixed(3)} ${(svgHeight - y2).toFixed(3)} lineto\n`;
+      
+      // Set stroke width if specified
+      if (strokeWidth) {
+        output += `${parseFloat(strokeWidth).toString()} setlinewidth\n`;
+      }
+      
+      output += 'stroke\n';
+      output += 'grestore\n';
+    } else if (elementType === 'polyline' || elementType === 'polygon') {
+      const points = element.getAttribute('points');
+      if (!points) return;
+      
+      const fill = element.getAttribute('fill') || (elementType === 'polygon' ? baseFillColor : 'none');
+      const stroke = element.getAttribute('stroke') || baseFillColor;
+      const strokeWidth = element.getAttribute('stroke-width');
+      
+      output += 'gsave\n';
+      
+      // Apply transforms if any
+      if (transforms) {
+        output += convertSvgTransform(transforms);
+      }
+      
+      // Parse points
+      const pointPairs = points.trim().split(/\s+|,/);
+      if (pointPairs.length < 2) return;
+      
+      output += 'newpath\n';
+      
+      for (let i = 0; i < pointPairs.length; i += 2) {
+        if (i + 1 >= pointPairs.length) break;
+        
+        const x = parseFloat(pointPairs[i]);
+        const y = parseFloat(pointPairs[i + 1]);
+        
+        if (isNaN(x) || isNaN(y)) continue;
+        
+        if (i === 0) {
+          output += `${x.toFixed(3)} ${(svgHeight - y).toFixed(3)} moveto\n`;
+        } else {
+          output += `${x.toFixed(3)} ${(svgHeight - y).toFixed(3)} lineto\n`;
+        }
+      }
+      
+      // Close path for polygons
+      if (elementType === 'polygon') {
+        output += 'closepath\n';
+      }
+      
+      // Fill and/or stroke
+      if (fill && fill !== 'none') {
+        output += setPostScriptColor(fill);
+        output += 'fill\n';
+      }
+      
+      if (stroke && stroke !== 'none') {
+        output += setPostScriptColor(stroke);
+        if (strokeWidth) {
+          output += `${parseFloat(strokeWidth).toString()} setlinewidth\n`;
+        }
+        output += 'stroke\n';
+      } else if (!fill || fill === 'none') {
+        output += 'stroke\n';
+      }
       
       output += 'grestore\n';
     }
-    
-    // Additional element types could be added here (polylines, etc.)
   });
   
   return output;

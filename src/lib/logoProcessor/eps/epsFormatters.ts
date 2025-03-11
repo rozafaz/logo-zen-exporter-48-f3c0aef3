@@ -5,7 +5,7 @@
 export const createEpsHeader = (width: number, height: number): string => {
   return `%!PS-Adobe-3.0 EPSF-3.0
 %%BoundingBox: 0 0 ${Math.ceil(width)} ${Math.ceil(height)}
-%%HiResBoundingBox: 0 0 ${width.toFixed(3)} ${height.toFixed(3)}
+%%HiResBoundingBox: 0.0 0.0 ${width.toFixed(3)} ${height.toFixed(3)}
 %%Creator: Logo Package Generator
 %%Title: Vector Logo
 %%DocumentData: Clean7Bit
@@ -31,23 +31,54 @@ export const createEpsHeader = (width: number, height: number): string => {
 /w {setlinewidth} def
 /sc {scale} def
 /tr {translate} def
-/st {stroke} def
-/fi {fill} def
-/sfi {gsave fill grestore stroke} def
+/ro {rotate} def
 /mt {matrix} def
+/ct {concat} def
+/ar {arc} def
+/ap {arc} def
+/sfi {gsave fill grestore stroke} def
+
+% Define a helper function for rounded rectangles
+/roundrect { % x y width height radius => -
+  /r exch def
+  /h exch def
+  /w exch def
+  /y exch def
+  /x exch def
+  
+  n
+  x r add y m
+  x w add y r sub r -90 0 ar
+  x w add y h add r sub r 0 90 ar
+  x r add y h add r 90 180 ar
+  x y r add r 180 270 ar
+  cp
+} def
+
+% Define a helper function for ellipses
+/ellipse { % x y xradius yradius => -
+  /yrad exch def
+  /xrad exch def
+  /y exch def
+  /x exch def
+  
+  matrix currentmatrix
+  x y tr
+  xrad yrad sc
+  0 0 1 0 360 arc
+  setmatrix
+} def
 %%EndProlog
 
 %%BeginSetup
 << /PageSize [${width} ${height}] >> setpagedevice
-1 setlinewidth
-0 setlinecap
-0 setlinejoin
+1 setlinecap
+1 setlinejoin
 10 setmiterlimit
 %%EndSetup
 
 %%Page: 1 1
 %%BeginPageSetup
-gsave
 %%EndPageSetup
 
 `;
@@ -58,8 +89,8 @@ gsave
  */
 export const createEpsFooter = (): string => {
   return `
-grestore
 showpage
+%%Trailer
 %%EOF`;
 };
 
