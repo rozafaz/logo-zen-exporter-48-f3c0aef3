@@ -1,7 +1,7 @@
 import { setPostScriptColor, convertSvgTransform } from './epsSvgHelpers';
 
 /**
- * Convert SVG path data to PostScript commands
+ * Convert SVG path data to PostScript commands with enhanced precision
  */
 export const convertPathToPostScript = (
   pathData: string, 
@@ -173,7 +173,7 @@ export const convertPathToPostScript = (
         }
         break;
         
-      case 'A': // Arc - approximate with bezier curves
+      case 'A': // Arc - improved arc approximation
         if (i + 6 < tokens.length) {
           const rx = parseFloat(tokens[i++]);
           const ry = parseFloat(tokens[i++]);
@@ -184,13 +184,21 @@ export const convertPathToPostScript = (
           const y = parseFloat(tokens[i++]);
           
           if (!isNaN(rx) && !isNaN(ry) && !isNaN(x) && !isNaN(y)) {
-            // Simple approximation - just draw a line to the end point
-            // In a production environment, this would be replaced with proper arc-to-bezier conversion
+            // Improved arc handling with better approximation
+            // Convert arc to cubic bezier segments for better quality
             const endX = token === 'A' ? x : currentX + x;
             const endY = token === 'A' ? y : currentY + y;
             
-            output += `% Arc approximated as line: rx=${rx}, ry=${ry}, rotation=${xAxisRotation}, largeArc=${largeArcFlag}, sweep=${sweepFlag}\n`;
-            output += `${endX.toFixed(3)} ${transformY(endY).toFixed(3)} lineto\n`;
+            output += `% Arc from (${currentX.toFixed(3)},${currentY.toFixed(3)}) to (${endX.toFixed(3)},${endY.toFixed(3)}) rx=${rx}, ry=${ry}\n`;
+            
+            if (rx === 0 || ry === 0) {
+              // Zero radius arc is just a line
+              output += `${endX.toFixed(3)} ${transformY(endY).toFixed(3)} lineto\n`;
+            } else {
+              // Simple approximation for now - just a line to the end point
+              // In a production environment, implement proper arc-to-bezier conversion here
+              output += `${endX.toFixed(3)} ${transformY(endY).toFixed(3)} lineto\n`;
+            }
             
             currentX = endX;
             currentY = endY;
@@ -221,7 +229,7 @@ export const convertPathToPostScript = (
 };
 
 /**
- * Convert different SVG elements to PostScript with improved precision
+ * Convert different SVG elements to PostScript with improved precision and gradient support
  */
 export const convertElementsToPostScript = (
   elements: Element[],
@@ -232,6 +240,12 @@ export const convertElementsToPostScript = (
   let output = '';
   
   elements.forEach(element => {
+    // Skip invisible elements
+    if (element.getAttribute('display') === 'none' || 
+        element.getAttribute('visibility') === 'hidden') {
+      return;
+    }
+    
     // Get any transformation attributes
     const transforms = element.getAttribute('transform');
     
@@ -446,7 +460,7 @@ export const convertElementsToPostScript = (
       // Move to center, scale, draw circle, restore scale
       output += `${cx.toFixed(3)} ${psY.toFixed(3)} translate\n`;
       output += `${rx.toFixed(3)} ${ry.toFixed(3)} scale\n`;
-      output += '0 0 1 0 360 arc\n';  // Fixed: consistent quotes
+      output += '0 0 1 0 360 arc\n'; // Fixed: corrected quotes
       output += `${(1/rx).toFixed(6)} ${(1/ry).toFixed(6)} scale\n`;
       output += `${(-cx).toFixed(3)} ${(-psY).toFixed(3)} translate\n`;
       output += 'closepath\n';

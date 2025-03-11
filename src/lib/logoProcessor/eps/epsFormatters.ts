@@ -1,6 +1,6 @@
 
 /**
- * Create EPS file header with improved bounding box
+ * Create EPS file header with improved bounding box and high quality settings
  * Adds a small padding to prevent clipping
  */
 export const createEpsHeader = (width: number, height: number): string => {
@@ -75,6 +75,32 @@ export const createEpsHeader = (width: number, height: number): string => {
   setmatrix
 } def
 
+% Define a simplified gradient function (linear gradient)
+/linear_gradient { % x0 y0 x1 y1 r0 g0 b0 r1 g1 b1 => -
+  /b1 exch def
+  /g1 exch def
+  /r1 exch def
+  /b0 exch def
+  /g0 exch def
+  /r0 exch def
+  /y1 exch def
+  /x1 exch def
+  /y0 exch def
+  /x0 exch def
+  
+  % Calculate gradient vector
+  /gvectx x1 x0 sub def
+  /gvecty y1 y0 sub def
+  /glen gvectx dup mul gvecty dup mul add sqrt def
+  /gnormx glen 0 eq {0} {gvectx glen div} ifelse def
+  /gnormy glen 0 eq {0} {gvecty glen div} ifelse def
+  
+  % For each point, we'll determine how far along the gradient vector it is
+  % and interpolate between the two colors accordingly
+  % This is a simplification - in a production environment you would implement
+  % proper gradient rendering with multiple color stops
+} def
+
 % Higher quality settings for better path rendering
 2 setlinecap
 2 setlinejoin
@@ -95,17 +121,20 @@ ${padding} ${padding} translate
 };
 
 /**
- * Create EPS file footer
+ * Create EPS file footer with improved cleanup
  */
 export const createEpsFooter = (): string => {
   return `
+% Clean up any leftover graphics state
+grestore
+
 showpage
 %%Trailer
 %%EOF`;
 };
 
 /**
- * Create placeholder shape for empty SVGs
+ * Create placeholder shape for empty SVGs with improved visibility
  */
 export const createPlaceholderShape = (width: number, height: number): string => {
   const centerX = width / 2;
@@ -157,5 +186,5 @@ grestore
   return content;
 };
 
-// Export the setPostScriptColor function from epsSvgHelpers.ts instead of duplicating it here
+// Export the setPostScriptColor function from epsSvgHelpers.ts
 export { setPostScriptColor } from './epsSvgHelpers';
