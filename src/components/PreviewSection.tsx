@@ -21,7 +21,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
     
     colors.forEach(color => {
       formats.forEach(format => {
-        if (['PNG', 'JPG'].includes(format)) {
+        if (format === 'PNG') {
           resolutions.forEach(resolution => {
             const icon = <Image className="w-4 h-4" />;
             const name = `${brandName}_${color}_${format}_${resolution}.${format.toLowerCase()}`;

@@ -75,13 +75,6 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
               onClick={() => toggleOption('formats', 'SVG')}
             />
             <FormatOption 
-              icon={<Image className="w-4 h-4" />}
-              label="JPG" 
-              description="Raster format"
-              isSelected={isSelected('formats', 'JPG')}
-              onClick={() => toggleOption('formats', 'JPG')}
-            />
-            <FormatOption 
               icon={<File className="w-4 h-4" />}
               label="PDF" 
               description="Vector document"

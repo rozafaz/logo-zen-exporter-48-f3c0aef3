@@ -1,9 +1,8 @@
-
 import { applyBlackFilter, applyWhiteFilter, applyGrayscaleFilter, applyInvertedFilter } from './colorUtils';
 import type { ProcessedFile } from './types';
 
 /**
- * Processes raster formats (PNG/JPG) with different color variations and resolutions
+ * Processes raster formats (PNG) with different color variations and resolutions
  */
 export const processRasterFormats = async (
   ctx: CanvasRenderingContext2D,
@@ -47,34 +46,30 @@ export const processRasterFormats = async (
       // Apply color variations
       applyColorFilter(ctx, canvas.width, canvas.height, color, colors);
       
-      // Convert to blob
-      const mimeType = format === 'PNG' ? 'image/png' : 'image/jpeg';
-      const quality = format === 'JPG' ? 0.9 : undefined;
-      
+      // Convert to blob (only PNG now)
       const blob = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob(
           (blob) => {
             if (blob) {
               resolve(blob);
             } else {
-              reject(new Error(`Failed to create ${format} blob`));
+              reject(new Error(`Failed to create PNG blob`));
             }
           }, 
-          mimeType, 
-          quality
+          'image/png'
         );
       });
       
-      console.log(`Created ${format} blob of size ${blob.size} bytes for ${resolution}`);
+      console.log(`Created PNG blob of size ${blob.size} bytes for ${resolution}`);
       
-      const formatFolder = `${format}`;
+      const formatFolder = 'PNG';
       files.push({
         folder: formatFolder,
-        filename: `${brandName}_${color}_${resolution}.${format.toLowerCase()}`,
+        filename: `${brandName}_${color}_${resolution}.png`,
         data: blob
       });
     } catch (error) {
-      console.error(`Error processing ${format} in ${resolution}:`, error);
+      console.error(`Error processing PNG in ${resolution}:`, error);
     }
   }
   

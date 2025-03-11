@@ -55,8 +55,8 @@ export const processLogo = async (
       console.log(`Processing ${color} color variation`);
       
       for (const format of formats) {
-        // Handle raster formats (PNG, JPG)
-        if (['PNG', 'JPG'].includes(format)) {
+        // Handle PNG format
+        if (format === 'PNG') {
           const rasterFiles = await processRasterFormats(
             ctx, canvas, originalLogo, format, color, resolutions, brandName, colors
           );
@@ -94,7 +94,7 @@ export const processLogo = async (
     throw error;
   } finally {
     // Clean up
-    URL.revokeObjectURL(logoUrl);
+    URL.revoObjectURL(logoUrl);
   }
   
   console.log(`Processing complete. Generated ${files.length} files.`);
