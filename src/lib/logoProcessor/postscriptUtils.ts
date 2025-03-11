@@ -7,25 +7,21 @@ export const createPostScriptHeader = (width: number, height: number): string =>
 %%Creator: Logo Package Generator
 %%Title: Vector Logo
 %%DocumentData: Clean7Bit
-%%LanguageLevel: 2
 %%Pages: 1
 %%EndComments
 
 %%BeginProlog
-/bd { bind def } bind def
-/m { moveto } bd
-/l { lineto } bd
-/c { curveto } bd
-/cp { closepath } bd
-/f { fill } bd
-/s { stroke } bd
-/rgb { setrgbcolor } bd
-/n { newpath } bd
-/gs { gsave } bd
-/gr { grestore } bd
-/tr { translate } bd
-/sc { scale } bd
-/ro { rotate } bd
+/m { moveto } def
+/l { lineto } def
+/c { curveto } def
+/cp { closepath } def
+/f { fill } def
+/s { stroke } def
+/rgb { setrgbcolor } def
+/w { setlinewidth } def
+/gs { gsave } def
+/gr { grestore } def
+/n { newpath } def
 %%EndProlog
 
 %%BeginSetup
@@ -38,13 +34,54 @@ export const createPostScriptHeader = (width: number, height: number): string =>
 %%Page: 1 1
 %%BeginPageSetup
 gs
-%%EndPageSetup\n`;
+%%EndPageSetup
+
+% Default to black if no color specified
+0 0 0 rgb
+
+`;
 };
 
 export const createPostScriptFooter = (): string => {
-  return `\ngr
+  return `
+gr
 showpage
 %%Trailer
 %%EOF`;
 };
 
+// Helper to create a basic shape when no paths are found
+export const createPostScriptPlaceholder = (width: number, height: number): string => {
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const size = Math.min(width, height) * 0.4;
+  
+  return `% Placeholder shape - rectangle in the center
+n
+${centerX - size} ${centerY - size} m
+${centerX + size} ${centerY - size} l
+${centerX + size} ${centerY + size} l
+${centerX - size} ${centerY + size} l
+cp
+0.8 0.8 0.8 rgb
+f
+`;
+};
+
+// Generate a simple shape for testing
+export const createTestShape = (width: number, height: number): string => {
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const size = Math.min(width, height) * 0.3;
+  
+  return `% Test shape - basic logo representation
+n
+${centerX} ${centerY + size} m
+${centerX + size} ${centerY} l
+${centerX} ${centerY - size} l
+${centerX - size} ${centerY} l
+cp
+0 0 0 rgb
+f
+`;
+};

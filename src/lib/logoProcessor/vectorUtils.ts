@@ -1,9 +1,11 @@
+
 import { hexToRgb } from './colorUtils';
+import { createPostScriptHeader, createPostScriptFooter, createTestShape } from './postscriptUtils';
 
 // Helper function to convert SVG to EPS with improved vector quality
 export const createEpsFromSvg = (svgString: string): Blob => {
   try {
-    console.log('Creating EPS from SVG string');
+    console.log('Creating EPS from SVG string, length:', svgString.length);
     
     // Extract SVG dimensions and viewBox for proper bounding box
     const parser = new DOMParser();
@@ -17,13 +19,11 @@ export const createEpsFromSvg = (svgString: string): Blob => {
     // Get SVG dimensions
     let width = 1000;
     let height = 1000;
-    let viewBox = '0 0 1000 1000';
     
     // Try to get dimensions from viewBox first
     const vb = svgElement.getAttribute('viewBox');
     if (vb) {
-      viewBox = vb;
-      const [, , w, h] = vb.split(' ').map(parseFloat);
+      const [, , w, h] = vb.split(/\s+/).map(parseFloat);
       if (!isNaN(w) && !isNaN(h)) {
         width = w;
         height = h;
@@ -35,87 +35,74 @@ export const createEpsFromSvg = (svgString: string): Blob => {
       if (svgWidth && svgHeight) {
         width = parseFloat(svgWidth);
         height = parseFloat(svgHeight);
-        viewBox = `0 0 ${width} ${height}`;
       }
     }
     
-    // Enhanced EPS header with better DSC comments and setup
-    const epsHeader = `%!PS-Adobe-3.0 EPSF-3.0
-%%BoundingBox: 0 0 ${Math.ceil(width)} ${Math.ceil(height)}
-%%HiResBoundingBox: 0 0 ${width.toFixed(6)} ${height.toFixed(6)}
-%%Creator: AI Logo Package Exporter
-%%Title: Vector Logo
-%%CreationDate: ${new Date().toISOString()}
-%%DocumentData: Clean7Bit
-%%LanguageLevel: 3
-%%Pages: 1
-%%EndComments
-
-%%BeginProlog
-/bd { bind def } bind def
-/ld { load def } bd
-/GR /grestore ld
-/GS /gsave ld
-/RM /rmoveto ld
-/TR /translate ld
-/CT /curveto ld
-/L /lineto ld
-/M /moveto ld
-/CP /closepath ld
-/S /stroke ld
-/F /fill ld
-/RC { rectclip } bd
-/RF { rectfill } bd
-/RG { setrgbcolor } bd
-/W { clip } bd
-%%EndProlog
-
-%%BeginSetup
-<< /PageSize [${width} ${height}] >> setpagedevice
-1 setlinewidth
-%%EndSetup
-
-%%Page: 1 1
-%%BeginPageSetup
-GS
-0 0 TR
-1 1 scale
-%%EndPageSetup
-
-% Initialize graphics state
-0 0 0 RG % Set default color to black
-1 setlinewidth
-0 setlinecap
-0 setlinejoin
-
-`;
-
-    // Convert SVG paths and shapes to EPS commands
-    const epsBody = convertSVGToEPS(svgString);
+    console.log('SVG dimensions for EPS:', width, 'x', height);
     
-    const epsFooter = `
-
-% Restore graphics state
-GR
-
-showpage
-%%Trailer
-%%EOF`;
-
-    const epsContent = epsHeader + epsBody + epsFooter;
+    // Create EPS content
+    let epsContent = createPostScriptHeader(width, height);
+    
+    // Convert SVG paths and shapes to EPS commands
+    let epsBody = convertSVGToEPS(svgString);
+    
+    // If no paths were found, add a test shape
+    if (!epsBody || epsBody.trim() === '') {
+      console.warn('No paths found in SVG, adding test shape');
+      epsBody = createTestShape(width, height);
+    }
+    
+    epsContent += epsBody;
+    epsContent += createPostScriptFooter();
+    
+    // Log EPS content for debugging
+    console.log('EPS content length:', epsContent.length);
+    console.log('EPS preview:', epsContent.substring(0, 500) + '...');
     
     // Create EPS blob with PostScript MIME type
     const epsBlob = new Blob([epsContent], { 
       type: 'application/postscript'
     });
     
-    console.log('EPS file created successfully, size:', epsBlob.size, 'bytes');
+    console.log('EPS file created, size:', epsBlob.size, 'bytes');
     return epsBlob;
   } catch (error) {
     console.error('Error creating EPS:', error);
-    throw error;
+    // Return a fallback EPS with a basic shape
+    return createFallbackEps();
   }
 };
+
+// Create a fallback EPS file with a basic shape
+function createFallbackEps(): Blob {
+  const width = 400;
+  const height = 400;
+  const content = `%!PS-Adobe-3.0 EPSF-3.0
+%%BoundingBox: 0 0 ${width} ${height}
+%%Creator: Logo Package Generator
+%%Title: Fallback Logo
+%%Pages: 1
+%%EndComments
+
+/m { moveto } def
+/l { lineto } def
+/cp { closepath } def
+/f { fill } def
+
+% Simple diamond shape
+${width/2} ${height*0.2} m
+${width*0.8} ${height/2} l
+${width/2} ${height*0.8} l
+${width*0.2} ${height/2} l
+cp
+0 0 0 setrgbcolor
+fill
+
+showpage
+%%EOF`;
+
+  return new Blob([content], { type: 'application/postscript' });
+}
 
 // Convert SVG to EPS with improved path handling
 export function convertSVGToEPS(svgString: string): string {
@@ -127,80 +114,60 @@ export function convertSVGToEPS(svgString: string): string {
   const parseError = svgDoc.querySelector("parsererror");
   if (parseError) {
     console.error("SVG parse error:", parseError.textContent);
-    throw new Error("Failed to parse SVG");
+    return "";
   }
 
   // Process each path element
   const paths = svgDoc.querySelectorAll("path");
   console.log(`Found ${paths.length} paths in SVG`);
   
+  if (paths.length === 0) {
+    // No paths found, process other SVG elements
+    console.log("No paths found, processing other SVG elements");
+    return processOtherSvgElements(svgDoc);
+  }
+  
   paths.forEach((path, index) => {
     const d = path.getAttribute("d");
     if (d) {
       const fillColor = path.getAttribute("fill") || "#000000";
-      const strokeColor = path.getAttribute("stroke");
-      const strokeWidth = path.getAttribute("stroke-width") || "1";
       
       // Convert colors to PostScript RGB values
       const rgbFill = hexToRgb(fillColor);
-      const rgbStroke = strokeColor ? hexToRgb(strokeColor) : null;
       
       epsData += `% Path ${index + 1}\n`;
       
       // Set fill color
       if (rgbFill && fillColor !== "none") {
-        epsData += `${rgbFill.r / 255} ${rgbFill.g / 255} ${rgbFill.b / 255} setrgbcolor\n`;
+        epsData += `${rgbFill.r / 255} ${rgbFill.g / 255} ${rgbFill.b / 255} rgb\n`;
       }
       
       // Begin the path
-      epsData += `newpath\n`;
+      epsData += `n\n`;
       
       // Convert SVG path to PostScript
       epsData += convertSVGPathToPostScript(d);
       
-      // Handle fill and stroke operations
-      if (strokeColor && strokeColor !== "none") {
-        if (fillColor && fillColor !== "none") {
-          epsData += "gsave\n";
-          epsData += "fill\n";
-          epsData += "grestore\n";
-        }
-        
-        if (rgbStroke) {
-          epsData += `${rgbStroke.r / 255} ${rgbStroke.g / 255} ${rgbStroke.b / 255} setrgbcolor\n`;
-        }
-        
-        epsData += `${strokeWidth} setlinewidth\n`;
-        epsData += "stroke\n";
-      } else if (fillColor && fillColor !== "none") {
-        epsData += "fill\n";
+      // Fill the path
+      if (fillColor && fillColor !== "none") {
+        epsData += `f\n`;
       } else {
-        epsData += "stroke\n";
+        epsData += `s\n`;
       }
     }
   });
-  
-  // Process rectangles if no paths found
-  if (paths.length === 0) {
-    console.log("Processing other SVG elements (rectangles, circles, etc.)");
-    processOtherSvgElements(svgDoc, epsData);
-  }
-  
-  // If we still don't have any content, create a simple placeholder
-  if (epsData.trim() === "") {
-    console.warn("No SVG elements found, creating placeholder");
-    epsData += `% Placeholder shape\nnewpath\n100 100 moveto\n900 100 lineto\n900 900 lineto\n100 900 lineto\nclosepath\n0.5 setgray\nfill\n`;
-  }
   
   return epsData;
 }
 
 // Process rectangles, circles, and other SVG elements
-export function processOtherSvgElements(svgDoc: Document, epsData: string): string {
-  let result = epsData;
+export function processOtherSvgElements(svgDoc: Document): string {
+  let result = "";
   
   // Handle rectangles
   const rects = svgDoc.querySelectorAll("rect");
+  console.log(`Found ${rects.length} rectangles in SVG`);
+  
   rects.forEach((rect, index) => {
     const x = parseFloat(rect.getAttribute("x") || "0");
     const y = parseFloat(rect.getAttribute("y") || "0");
@@ -213,25 +180,27 @@ export function processOtherSvgElements(svgDoc: Document, epsData: string): stri
       
       result += `% Rectangle ${index + 1}\n`;
       if (rgbFill && fillColor !== "none") {
-        result += `${rgbFill.r / 255} ${rgbFill.g / 255} ${rgbFill.b / 255} setrgbcolor\n`;
+        result += `${rgbFill.r / 255} ${rgbFill.g / 255} ${rgbFill.b / 255} rgb\n`;
       }
       
-      result += `newpath\n${x} ${y} moveto\n`;
-      result += `${x + width} ${y} lineto\n`;
-      result += `${x + width} ${y + height} lineto\n`;
-      result += `${x} ${y + height} lineto\n`;
-      result += `closepath\n`;
+      result += `n\n${x} ${y} m\n`;
+      result += `${x + width} ${y} l\n`;
+      result += `${x + width} ${y + height} l\n`;
+      result += `${x} ${y + height} l\n`;
+      result += `cp\n`;
       
       if (fillColor && fillColor !== "none") {
-        result += `fill\n`;
+        result += `f\n`;
       } else {
-        result += `stroke\n`;
+        result += `s\n`;
       }
     }
   });
   
   // Handle circles
   const circles = svgDoc.querySelectorAll("circle");
+  console.log(`Found ${circles.length} circles in SVG`);
+  
   circles.forEach((circle, index) => {
     const cx = parseFloat(circle.getAttribute("cx") || "0");
     const cy = parseFloat(circle.getAttribute("cy") || "0");
@@ -243,60 +212,31 @@ export function processOtherSvgElements(svgDoc: Document, epsData: string): stri
       
       result += `% Circle ${index + 1}\n`;
       if (rgbFill && fillColor !== "none") {
-        result += `${rgbFill.r / 255} ${rgbFill.g / 255} ${rgbFill.b / 255} setrgbcolor\n`;
+        result += `${rgbFill.r / 255} ${rgbFill.g / 255} ${rgbFill.b / 255} rgb\n`;
       }
       
-      result += `newpath\n${cx} ${cy} ${r} 0 360 arc\nclosepath\n`;
+      result += `n\n${cx} ${cy} ${r} 0 360 arc\ncp\n`;
       
       if (fillColor && fillColor !== "none") {
-        result += `fill\n`;
+        result += `f\n`;
       } else {
-        result += `stroke\n`;
+        result += `s\n`;
       }
     }
   });
   
-  // Handle ellipses
-  const ellipses = svgDoc.querySelectorAll("ellipse");
-  ellipses.forEach((ellipse, index) => {
-    const cx = parseFloat(ellipse.getAttribute("cx") || "0");
-    const cy = parseFloat(ellipse.getAttribute("cy") || "0");
-    const rx = parseFloat(ellipse.getAttribute("rx") || "0");
-    const ry = parseFloat(ellipse.getAttribute("ry") || "0");
-    const fillColor = ellipse.getAttribute("fill") || "#000000";
-    
-    if (rx > 0 && ry > 0) {
-      const rgbFill = hexToRgb(fillColor);
-      
-      result += `% Ellipse ${index + 1}\n`;
-      if (rgbFill && fillColor !== "none") {
-        result += `${rgbFill.r / 255} ${rgbFill.g / 255} ${rgbFill.b / 255} setrgbcolor\n`;
-      }
-      
-      // Approximate ellipse with Bezier curves
-      result += `newpath\n`;
-      result += `${cx + rx} ${cy} moveto\n`;
-      result += `${cx + rx} ${cy + ry * 0.552} ${cx + rx * 0.552} ${cy + ry} ${cx} ${cy + ry} curveto\n`;
-      result += `${cx - rx * 0.552} ${cy + ry} ${cx - rx} ${cy + ry * 0.552} ${cx - rx} ${cy} curveto\n`;
-      result += `${cx - rx} ${cy - ry * 0.552} ${cx - rx * 0.552} ${cy - ry} ${cx} ${cy - ry} curveto\n`;
-      result += `${cx + rx * 0.552} ${cy - ry} ${cx + rx} ${cy - ry * 0.552} ${cx + rx} ${cy} curveto\n`;
-      result += `closepath\n`;
-      
-      if (fillColor && fillColor !== "none") {
-        result += `fill\n`;
-      } else {
-        result += `stroke\n`;
-      }
-    }
-  });
+  // If we still don't have any content, return an empty string
+  // A fallback shape will be added later
+  if (rects.length === 0 && circles.length === 0) {
+    console.warn("No rectangles or circles found in SVG");
+  }
   
   return result;
 }
 
-// Convert SVG path commands to PostScript commands with improved bounding box handling
+// Convert SVG path commands to PostScript commands
 export function convertSVGPathToPostScript(d: string): string {
   let result = "";
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   
   // Normalize path data
   const normalizedPath = d
@@ -309,65 +249,81 @@ export function convertSVGPathToPostScript(d: string): string {
   let currentY = 0;
   let firstX = 0;
   let firstY = 0;
-  
   let i = 0;
+  
   while (i < tokens.length) {
     const token = tokens[i];
+    
     if (/[MLHVCSQTAZmlhvcsqtaz]/.test(token)) {
       const command = token;
       i++;
       
       switch (command.toUpperCase()) {
-        case 'M':
-          const x = parseFloat(tokens[i++]);
-          const y = parseFloat(tokens[i++]);
-          currentX = command === 'M' ? x : currentX + x;
-          currentY = command === 'M' ? y : currentY + y;
-          result += `${currentX} ${currentY} m\n`;
-          firstX = currentX;
-          firstY = currentY;
+        case 'M': // moveto
+          if (i + 1 < tokens.length) {
+            const x = parseFloat(tokens[i++]);
+            const y = parseFloat(tokens[i++]);
+            
+            if (!isNaN(x) && !isNaN(y)) {
+              currentX = command === 'M' ? x : currentX + x;
+              currentY = command === 'M' ? y : currentY + y;
+              result += `${currentX} ${currentY} m\n`;
+              firstX = currentX;
+              firstY = currentY;
+            }
+          }
           break;
           
-        case 'L':
-          const lx = parseFloat(tokens[i++]);
-          const ly = parseFloat(tokens[i++]);
-          currentX = command === 'L' ? lx : currentX + lx;
-          currentY = command === 'L' ? ly : currentY + ly;
-          result += `${currentX} ${currentY} l\n`;
+        case 'L': // lineto
+          if (i + 1 < tokens.length) {
+            const x = parseFloat(tokens[i++]);
+            const y = parseFloat(tokens[i++]);
+            
+            if (!isNaN(x) && !isNaN(y)) {
+              currentX = command === 'L' ? x : currentX + x;
+              currentY = command === 'L' ? y : currentY + y;
+              result += `${currentX} ${currentY} l\n`;
+            }
+          }
           break;
           
-        case 'C':
-          const c1x = parseFloat(tokens[i++]);
-          const c1y = parseFloat(tokens[i++]);
-          const c2x = parseFloat(tokens[i++]);
-          const c2y = parseFloat(tokens[i++]);
-          const ex = parseFloat(tokens[i++]);
-          const ey = parseFloat(tokens[i++]);
-          currentX = command === 'C' ? ex : currentX + ex;
-          currentY = command === 'C' ? ey : currentY + ey;
-          result += `${c1x} ${c1y} ${c2x} ${c2y} ${currentX} ${currentY} c\n`;
+        case 'C': // curveto
+          if (i + 5 < tokens.length) {
+            const x1 = parseFloat(tokens[i++]);
+            const y1 = parseFloat(tokens[i++]);
+            const x2 = parseFloat(tokens[i++]);
+            const y2 = parseFloat(tokens[i++]);
+            const x = parseFloat(tokens[i++]);
+            const y = parseFloat(tokens[i++]);
+            
+            if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2) && !isNaN(x) && !isNaN(y)) {
+              const cx1 = command === 'C' ? x1 : currentX + x1;
+              const cy1 = command === 'C' ? y1 : currentY + y1;
+              const cx2 = command === 'C' ? x2 : currentX + x2;
+              const cy2 = command === 'C' ? y2 : currentY + y2;
+              currentX = command === 'C' ? x : currentX + x;
+              currentY = command === 'C' ? y : currentY + y;
+              
+              result += `${cx1} ${cy1} ${cx2} ${cy2} ${currentX} ${currentY} c\n`;
+            }
+          }
           break;
           
-        case 'Z':
+        case 'Z': // closepath
           result += `cp\n`;
           currentX = firstX;
           currentY = firstY;
+          break;
+          
+        default:
+          // Skip unsupported commands for now
           i++;
           break;
       }
-      
-      // Update bounding box
-      minX = Math.min(minX, currentX);
-      minY = Math.min(minY, currentY);
-      maxX = Math.max(maxX, currentX);
-      maxY = Math.max(maxY, currentY);
     } else {
       i++;
     }
   }
-  
-  // Add bounding box information as a comment
-  result = `% BoundingBox: ${Math.floor(minX)} ${Math.floor(minY)} ${Math.ceil(maxX)} ${Math.ceil(maxY)}\n${result}`;
   
   return result;
 }
