@@ -1,9 +1,8 @@
-
 import type { ExportSettings, ProcessedFile } from './types';
 import { processRasterFormats, processIcoFormat } from './rasterUtils';
 import { processSvgFormat } from './svgUtils';
 import { processPdfFromSvg, processPdfFromRaster } from './pdfProcessor';
-import { createEpsFromSvg } from './epsUtils';
+import { createEpsFromSvg } from './eps/epsCore';
 
 export const processLogo = async (
   logoFile: File, 
