@@ -69,8 +69,16 @@ export const convertSvgToEps = (svgContent: string, color: string): string => {
     const dimensions = getSvgDimensions(svgElement);
     console.log('SVG dimensions for EPS:', dimensions);
     
+    // Preprocess SVG by transforming elements to handle coordinate system differences
+    transformSvgForEps(svgDoc, dimensions.height);
+    
     // Generate EPS header with proper dimensions
     let epsContent = createEpsHeader(dimensions.width, dimensions.height);
+    
+    // Add coordinate system setup - flip Y axis to match SVG's coordinate system
+    epsContent += `% Setup coordinate system to match SVG (origin at top-left)\n`;
+    epsContent += `1 -1 scale\n`;
+    epsContent += `0 ${-dimensions.height} translate\n\n`;
     
     // Process all SVG elements and convert to PostScript commands
     const paths = Array.from(svgDoc.querySelectorAll('path'));
@@ -134,5 +142,45 @@ export const convertSvgToEps = (svgContent: string, color: string): string => {
     console.error('Error in SVG to EPS conversion:', error);
     // Return a fallback/placeholder EPS file
     return createFallbackEps();
+  }
+};
+
+/**
+ * Transform SVG elements to prepare for EPS conversion
+ * This helps address coordinate system differences between SVG and PostScript
+ */
+const transformSvgForEps = (svgDoc: Document, svgHeight: number): void => {
+  // For paths that need special handling for coordinate systems
+  const paths = svgDoc.querySelectorAll('path');
+  paths.forEach(path => {
+    // Ensure path has proper attributes
+    if (!path.hasAttribute('fill') && !path.hasAttribute('stroke')) {
+      path.setAttribute('fill', '#000000');
+    }
+    
+    // Preserve original data for debugging
+    if (path.hasAttribute('d')) {
+      path.setAttribute('data-original-d', path.getAttribute('d') || '');
+    }
+  });
+  
+  // Apply any other transformations needed for proper conversion
+  const svgElement = svgDoc.querySelector('svg');
+  if (svgElement) {
+    // Check if viewBox is present, if not and we have width/height, create one
+    if (!svgElement.hasAttribute('viewBox') && 
+        svgElement.hasAttribute('width') && 
+        svgElement.hasAttribute('height')) {
+      const width = svgElement.getAttribute('width');
+      const height = svgElement.getAttribute('height');
+      if (width && height) {
+        // Remove any units (px, pt, etc.)
+        const w = parseFloat(width);
+        const h = parseFloat(height);
+        if (!isNaN(w) && !isNaN(h)) {
+          svgElement.setAttribute('viewBox', `0 0 ${w} ${h}`);
+        }
+      }
+    }
   }
 };

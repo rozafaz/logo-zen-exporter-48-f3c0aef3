@@ -9,10 +9,11 @@ export const createEpsHeader = (width: number, height: number): string => {
 %%Creator: Logo Package Generator
 %%Title: Vector Logo
 %%DocumentData: Clean7Bit
-%%Pages: 1
+%%DocumentProcessColors: Black
 %%EndComments
 
 %%BeginProlog
+% Define shortcuts for frequently used operations
 /m {moveto} def
 /l {lineto} def
 /c {curveto} def
@@ -25,9 +26,15 @@ export const createEpsHeader = (width: number, height: number): string => {
 /rf {rectfill} def
 /rgb {setrgbcolor} def
 /s {stroke} def
-/w {setlinewidth} def
 /f {fill} def
 /n {newpath} def
+/w {setlinewidth} def
+/sc {scale} def
+/tr {translate} def
+/st {stroke} def
+/fi {fill} def
+/sfi {gsave fill grestore stroke} def
+/mt {matrix} def
 %%EndProlog
 
 %%BeginSetup
@@ -40,7 +47,7 @@ export const createEpsHeader = (width: number, height: number): string => {
 
 %%Page: 1 1
 %%BeginPageSetup
-gs
+gsave
 %%EndPageSetup
 
 `;
@@ -51,9 +58,8 @@ gs
  */
 export const createEpsFooter = (): string => {
   return `
-gr
+grestore
 showpage
-%%Trailer
 %%EOF`;
 };
 
@@ -66,6 +72,7 @@ export const createPlaceholderShape = (width: number, height: number): string =>
   const size = Math.min(width, height) * 0.4;
   
   return `% Placeholder shape due to missing vector elements
+gsave
 newpath
 ${centerX - size} ${centerY - size} moveto
 ${centerX + size} ${centerY - size} lineto
@@ -74,6 +81,7 @@ ${centerX - size} ${centerY + size} lineto
 closepath
 0.8 0.8 0.8 setrgbcolor
 fill
+grestore
 `;
 };
 
@@ -87,6 +95,7 @@ export const createFallbackEps = (): string => {
   let content = createEpsHeader(width, height);
   content += `
 % Fallback shape - logo conversion error indicator
+gsave
 newpath
 200 150 moveto
 300 300 lineto
@@ -94,12 +103,13 @@ newpath
 closepath
 0.2 0.2 0.2 setrgbcolor
 fill
-  
+
 newpath
 200 250 50 0 360 arc
 closepath
 0.8 0.8 0.8 setrgbcolor
 fill
+grestore
 `;
   content += createEpsFooter();
   

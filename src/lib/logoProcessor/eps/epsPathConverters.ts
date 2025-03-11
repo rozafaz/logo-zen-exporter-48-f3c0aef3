@@ -1,3 +1,4 @@
+
 import { setPostScriptColor } from './epsSvgHelpers';
 
 /**
@@ -248,7 +249,7 @@ export const convertElementsToPostScript = (
       // Set color for this rectangle
       output += setPostScriptColor(rectFill);
       
-      // Convert SVG y-coordinate to PostScript y-coordinate
+      // Convert SVG y-coordinate to PostScript y-coordinate (fix the coordinate system)
       const psY = svgHeight - y - height;
       
       // Create rectangle path, handling rounded corners if specified
@@ -289,9 +290,10 @@ export const convertElementsToPostScript = (
       // Set color for this circle
       output += setPostScriptColor(circleFill);
       
-      // Create circle - adjust Y coordinate for PostScript
+      // Create circle - properly adjust Y coordinate for PostScript
+      const psY = svgHeight - cy;
       output += 'newpath\n';
-      output += `${cx} ${svgHeight - cy} ${r} 0 360 arc\n`;
+      output += `${cx.toString()} ${psY.toString()} ${r.toString()} 0 360 arc\n`;
       output += 'closepath\n';
       output += 'fill\n';
       
