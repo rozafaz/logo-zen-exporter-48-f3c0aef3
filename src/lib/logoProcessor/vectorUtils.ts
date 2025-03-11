@@ -296,8 +296,9 @@ export function processOtherSvgElements(svgDoc: Document, epsData: string): stri
 // Convert SVG path commands to PostScript commands with improved bounding box handling
 export function convertSVGPathToPostScript(d: string): string {
   let result = "";
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   
-  // Normalize path data by adding spaces between commands and parameters
+  // Normalize path data
   const normalizedPath = d
     .replace(/([MLHVCSQTAZmlhvcsqtaz])/g, ' $1 ')
     .replace(/\s+/g, ' ')
@@ -308,160 +309,65 @@ export function convertSVGPathToPostScript(d: string): string {
   let currentY = 0;
   let firstX = 0;
   let firstY = 0;
-  let prevCommand = '';
   
   let i = 0;
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  
   while (i < tokens.length) {
     const token = tokens[i];
-    
     if (/[MLHVCSQTAZmlhvcsqtaz]/.test(token)) {
       const command = token;
       i++;
       
-      switch (command) {
+      switch (command.toUpperCase()) {
         case 'M':
-        case 'm':
-          while (i < tokens.length && !isNaN(parseFloat(tokens[i]))) {
-            const x = parseFloat(tokens[i++]);
-            const y = parseFloat(tokens[i++]);
-            
-            if (command === 'm') {
-              currentX += x;
-              currentY += y;
-            } else {
-              currentX = x;
-              currentY = y;
-            }
-            
-            // Update bounding box
-            minX = Math.min(minX, currentX);
-            minY = Math.min(minY, currentY);
-            maxX = Math.max(maxX, currentX);
-            maxY = Math.max(maxY, currentY);
-            
-            if (prevCommand === '') {
-              firstX = currentX;
-              firstY = currentY;
-            }
-            
-            result += `${currentX} ${currentY} moveto\n`;
-          }
+          const x = parseFloat(tokens[i++]);
+          const y = parseFloat(tokens[i++]);
+          currentX = command === 'M' ? x : currentX + x;
+          currentY = command === 'M' ? y : currentY + y;
+          result += `${currentX} ${currentY} m\n`;
+          firstX = currentX;
+          firstY = currentY;
           break;
           
         case 'L':
-        case 'l':
-          while (i < tokens.length && !isNaN(parseFloat(tokens[i]))) {
-            const x = parseFloat(tokens[i++]);
-            const y = parseFloat(tokens[i++]);
-            
-            if (command === 'l') {
-              currentX += x;
-              currentY += y;
-            } else {
-              currentX = x;
-              currentY = y;
-            }
-            
-            // Update bounding box
-            minX = Math.min(minX, currentX);
-            minY = Math.min(minY, currentY);
-            maxX = Math.max(maxX, currentX);
-            maxY = Math.max(maxY, currentY);
-            
-            result += `${currentX} ${currentY} lineto\n`;
-          }
-          break;
-          
-        case 'H':
-        case 'h':
-          while (i < tokens.length && !isNaN(parseFloat(tokens[i]))) {
-            const x = parseFloat(tokens[i++]);
-            
-            if (command === 'h') {
-              currentX += x;
-            } else {
-              currentX = x;
-            }
-            
-            result += `${currentX} ${currentY} lineto\n`;
-          }
-          break;
-          
-        case 'V':
-        case 'v':
-          while (i < tokens.length && !isNaN(parseFloat(tokens[i]))) {
-            const y = parseFloat(tokens[i++]);
-            
-            if (command === 'v') {
-              currentY += y;
-            } else {
-              currentY = y;
-            }
-            
-            result += `${currentX} ${currentY} lineto\n`;
-          }
+          const lx = parseFloat(tokens[i++]);
+          const ly = parseFloat(tokens[i++]);
+          currentX = command === 'L' ? lx : currentX + lx;
+          currentY = command === 'L' ? ly : currentY + ly;
+          result += `${currentX} ${currentY} l\n`;
           break;
           
         case 'C':
-        case 'c':
-          while (i < tokens.length && !isNaN(parseFloat(tokens[i]))) {
-            const x1 = parseFloat(tokens[i++]);
-            const y1 = parseFloat(tokens[i++]);
-            const x2 = parseFloat(tokens[i++]);
-            const y2 = parseFloat(tokens[i++]);
-            const x = parseFloat(tokens[i++]);
-            const y = parseFloat(tokens[i++]);
-            
-            let cp1x, cp1y, cp2x, cp2y, endX, endY;
-            
-            if (command === 'c') {
-              cp1x = currentX + x1;
-              cp1y = currentY + y1;
-              cp2x = currentX + x2;
-              cp2y = currentY + y2;
-              endX = currentX + x;
-              endY = currentY + y;
-            } else {
-              cp1x = x1;
-              cp1y = y1;
-              cp2x = x2;
-              cp2y = y2;
-              endX = x;
-              endY = y;
-            }
-            
-            result += `${cp1x} ${cp1y} ${cp2x} ${cp2y} ${endX} ${endY} curveto\n`;
-            
-            currentX = endX;
-            currentY = endY;
-          }
+          const c1x = parseFloat(tokens[i++]);
+          const c1y = parseFloat(tokens[i++]);
+          const c2x = parseFloat(tokens[i++]);
+          const c2y = parseFloat(tokens[i++]);
+          const ex = parseFloat(tokens[i++]);
+          const ey = parseFloat(tokens[i++]);
+          currentX = command === 'C' ? ex : currentX + ex;
+          currentY = command === 'C' ? ey : currentY + ey;
+          result += `${c1x} ${c1y} ${c2x} ${c2y} ${currentX} ${currentY} c\n`;
           break;
           
         case 'Z':
-        case 'z':
-          result += `closepath\n`;
+          result += `cp\n`;
           currentX = firstX;
           currentY = firstY;
-          i++; // Move past the Z command
-          break;
-          
-        default:
           i++;
-          while (i < tokens.length && !isNaN(parseFloat(tokens[i]))) {
-            i++;
-          }
+          break;
       }
       
-      prevCommand = command;
+      // Update bounding box
+      minX = Math.min(minX, currentX);
+      minY = Math.min(minY, currentY);
+      maxX = Math.max(maxX, currentX);
+      maxY = Math.max(maxY, currentY);
     } else {
       i++;
     }
   }
   
   // Add bounding box information as a comment
-  result = `% BoundingBox: ${Math.floor(minX)} ${Math.floor(minY)} ${Math.ceil(maxX)} ${Math.ceil(maxY)}\n` + result;
+  result = `% BoundingBox: ${Math.floor(minX)} ${Math.floor(minY)} ${Math.ceil(maxX)} ${Math.ceil(maxY)}\n${result}`;
   
   return result;
 }

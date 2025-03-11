@@ -208,7 +208,7 @@ export const createPdfFromImage = async (imageDataUrl: string): Promise<Blob> =>
   }
 };
 
-// Convert vector PDF paths to EPS
+// Convert vector PDF paths to EPS with improved vector quality
 export const convertPdfToEps = async (pdfBlob: Blob): Promise<Blob> => {
   try {
     const arrayBuffer = await pdfBlob.arrayBuffer();
@@ -220,10 +220,21 @@ export const convertPdfToEps = async (pdfBlob: Blob): Promise<Blob> => {
     const paths = extractSimplePaths(await pdfBlob.text());
     let epsContent = createPostScriptHeader(width, height);
 
-    // Convert each path to PostScript commands
+    // Convert each path to PostScript commands with proper scaling and positioning
     paths.forEach(path => {
       const color = getPostScriptColor(path.fill || '#000000');
-      epsContent += `\n% Path\n${color} rgb\nnewpath\n${path.d}\nfill\n`;
+      if (path.type === 'path') {
+        epsContent += `\n% Path\n${color} rgb\nn\n${path.d}\ncp\nf\n`;
+      } else if (path.type === 'rect') {
+        const x = path.x || 0;
+        const y = height - (path.y || 0) - (path.height || 0); // Flip Y coordinates
+        epsContent += `\n% Rectangle\n${color} rgb\nn\n${x} ${y} m\n${x + path.width} ${y} l\n${x + path.width} ${y + path.height} l\n${x} ${y + path.height} l\ncp\nf\n`;
+      } else if (path.type === 'circle') {
+        const cx = path.cx || 0;
+        const cy = height - (path.cy || 0); // Flip Y coordinates
+        const r = path.r || 0;
+        epsContent += `\n% Circle\n${color} rgb\nn\n${cx} ${cy} ${r} 0 360 arc\ncp\nf\n`;
+      }
     });
 
     epsContent += createPostScriptFooter();

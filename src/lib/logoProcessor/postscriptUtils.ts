@@ -20,22 +20,28 @@ export const createPostScriptHeader = (width: number, height: number): string =>
 /f { fill } bd
 /s { stroke } bd
 /rgb { setrgbcolor } bd
+/n { newpath } bd
+/gs { gsave } bd
+/gr { grestore } bd
 %%EndProlog
 
 %%BeginSetup
 << /PageSize [${width} ${height}] >> setpagedevice
 1 setlinewidth
+0 setlinecap
+0 setlinejoin
 %%EndSetup
 
 %%Page: 1 1
 %%BeginPageSetup
-gsave
+gs
 %%EndPageSetup\n`;
 };
 
 export const createPostScriptFooter = (): string => {
-  return `\ngrestore
+  return `\ngr
 showpage
 %%Trailer
 %%EOF`;
 };
+
