@@ -1,4 +1,3 @@
-
 import JSZip from 'jszip';
 import { PDFDocument } from 'pdf-lib';
 import type { ExportSettings } from '@/components/ExportOptions';
@@ -9,188 +8,25 @@ interface ProcessedFile {
   data: Blob;
 }
 
-// Helper function to convert SVG path commands to PostScript
-const convertSvgPathToPostScript = (svgPath: string): string => {
-  // Advanced conversion of SVG path commands to PostScript
-  return svgPath
-    .replace(/([Mm])\s*([0-9.-]+)[,\s]([0-9.-]+)/g, (_, cmd, x, y) => 
-      `${x} ${y} ${cmd === 'm' ? 'rmoveto' : 'moveto'}\n`)
-    .replace(/([Ll])\s*([0-9.-]+)[,\s]([0-9.-]+)/g, (_, cmd, x, y) => 
-      `${x} ${y} ${cmd === 'l' ? 'rlineto' : 'lineto'}\n`)
-    .replace(/([Zz])/g, 'closepath\n')
-    .replace(/([Cc])\s*([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)/g, 
-      (_, cmd, x1, y1, x2, y2, x, y) => `${x1} ${y1} ${x2} ${y2} ${x} ${y} curveto\n`);
-};
-
-// Create PDF from image data
-const createPdfFromImage = async (pngDataUrl: string): Promise<Blob> => {
-  try {
-    console.log('Creating PDF from PNG data URL');
-    const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([600, 600]);
-    
-    const pngImage = await fetch(pngDataUrl).then(res => res.arrayBuffer());
-    const image = await pdfDoc.embedPng(pngImage);
-    
-    const { width, height } = image.scale(1);
-    const scale = Math.min(500 / width, 500 / height);
-    
-    page.drawImage(image, {
-      x: (600 - width * scale) / 2,
-      y: (600 - height * scale) / 2,
-      width: width * scale,
-      height: height * scale,
-    });
-    
-    const pdfBytes = await pdfDoc.save();
-    console.log('PDF created successfully');
-    return new Blob([pdfBytes], { type: 'application/pdf' });
-  } catch (error) {
-    console.error('Error creating PDF from image:', error);
-    throw error;
-  }
-};
-
-// Improved EPS generation from SVG with proper vector paths
+// Helper function to convert SVG to EPS with improved vector quality
 const createEpsFromSvg = (svgString: string): Blob => {
   try {
     console.log('Creating EPS from SVG string');
     
-    // Improved EPS header with proper bounding box
     const epsHeader = `%!PS-Adobe-3.0 EPSF-3.0
 %%BoundingBox: 0 0 1000 1000
-%%Creator: Logo Exporter
-%%Pages: 1
+%%HiResBoundingBox: 0 0 1000 1000
 %%EndComments
-%%BeginProlog
-/m { moveto } bind def
-/l { lineto } bind def
-/c { curveto } bind def
-/h { closepath } bind def
-/f { fill } bind def
-/s { stroke } bind def
-/rgb { setrgbcolor } bind def
-%%EndProlog
-%%Page: 1 1
-
-% Initialize graphics state
-0 setgray
-1 setlinewidth
-1 setlinecap
-1 setlinejoin
-
-% Center the drawing
-500 500 translate
-1 -1 scale % Flip vertically to match SVG coordinate system
-
+/Helvetica findfont 12 scalefont setfont
+newpath
 `;
+
+    const epsFooter = `showpage
+%%EOF`;
+
+    // Convert the entire SVG into a PostScript-friendly format
+    const epsBody = convertSVGToEPS(svgString);
     
-    // Parse SVG and extract paths with proper error handling
-    const parser = new DOMParser();
-    const svgDoc = parser.parseFromString(svgString, "image/svg+xml");
-    
-    // Check for parsing errors
-    const parseError = svgDoc.querySelector("parsererror");
-    if (parseError) {
-      console.error("SVG parse error:", parseError.textContent);
-      throw new Error("Failed to parse SVG");
-    }
-    
-    const paths = svgDoc.querySelectorAll("path");
-    console.log(`Found ${paths.length} paths in SVG`);
-    
-    let epsBody = "";
-    if (paths.length > 0) {
-      paths.forEach((path, index) => {
-        const d = path.getAttribute("d");
-        if (d) {
-          const fillColor = path.getAttribute("fill") || "#000000";
-          const strokeColor = path.getAttribute("stroke");
-          
-          // Convert hex color to RGB values for PostScript
-          const rgbFill = hexToRgb(fillColor);
-          
-          epsBody += `% Path ${index + 1}\n`;
-          
-          // Set fill color if available
-          if (rgbFill) {
-            epsBody += `${rgbFill.r / 255} ${rgbFill.g / 255} ${rgbFill.b / 255} rgb\n`;
-          }
-          
-          // Improved path conversion
-          epsBody += `newpath\n`;
-          epsBody += svgPathToPostScript(d);
-          
-          // Apply fill and/or stroke
-          if (strokeColor && strokeColor !== "none") {
-            epsBody += "gsave\n";
-            const rgbStroke = hexToRgb(strokeColor);
-            if (rgbStroke) {
-              epsBody += `${rgbStroke.r / 255} ${rgbStroke.g / 255} ${rgbStroke.b / 255} rgb\n`;
-            }
-            epsBody += "stroke\ngrestore\n";
-          }
-          
-          if (fillColor && fillColor !== "none") {
-            epsBody += "fill\n";
-          } else {
-            epsBody += "stroke\n";
-          }
-        }
-      });
-    } else {
-      // If no paths found, try to handle rect, circle, etc.
-      console.log("No paths found, looking for other SVG elements");
-      
-      // Handle rectangles
-      const rects = svgDoc.querySelectorAll("rect");
-      rects.forEach((rect, index) => {
-        const x = parseFloat(rect.getAttribute("x") || "0");
-        const y = parseFloat(rect.getAttribute("y") || "0");
-        const width = parseFloat(rect.getAttribute("width") || "0");
-        const height = parseFloat(rect.getAttribute("height") || "0");
-        const fillColor = rect.getAttribute("fill") || "#000000";
-        
-        const rgbFill = hexToRgb(fillColor);
-        
-        epsBody += `% Rectangle ${index + 1}\n`;
-        if (rgbFill) {
-          epsBody += `${rgbFill.r / 255} ${rgbFill.g / 255} ${rgbFill.b / 255} rgb\n`;
-        }
-        
-        epsBody += `newpath\n${x} ${y} m\n`;
-        epsBody += `${x + width} ${y} l\n`;
-        epsBody += `${x + width} ${y + height} l\n`;
-        epsBody += `${x} ${y + height} l\n`;
-        epsBody += `h\nf\n`;
-      });
-      
-      // Handle circles
-      const circles = svgDoc.querySelectorAll("circle");
-      circles.forEach((circle, index) => {
-        const cx = parseFloat(circle.getAttribute("cx") || "0");
-        const cy = parseFloat(circle.getAttribute("cy") || "0");
-        const r = parseFloat(circle.getAttribute("r") || "0");
-        const fillColor = circle.getAttribute("fill") || "#000000";
-        
-        const rgbFill = hexToRgb(fillColor);
-        
-        epsBody += `% Circle ${index + 1}\n`;
-        if (rgbFill) {
-          epsBody += `${rgbFill.r / 255} ${rgbFill.g / 255} ${rgbFill.b / 255} rgb\n`;
-        }
-        
-        epsBody += `newpath\n${cx} ${cy} ${r} 0 360 arc\nh\nf\n`;
-      });
-    }
-    
-    // If we still don't have any content, create a simple placeholder
-    if (epsBody.trim() === "") {
-      console.warn("No SVG elements found, creating placeholder");
-      epsBody += `% Placeholder shape\nnewpath\n-100 -100 m\n100 -100 l\n100 100 l\n-100 100 l\nh\n0.5 setgray\nf\n`;
-    }
-    
-    const epsFooter = "\nshowpage\n%%EOF";
     const epsContent = epsHeader + epsBody + epsFooter;
     
     console.log('EPS file created successfully');
@@ -201,20 +37,127 @@ const createEpsFromSvg = (svgString: string): Blob => {
   }
 };
 
-// Improved SVG path to PostScript conversion function
-const svgPathToPostScript = (svgPath: string): string => {
-  return svgPath
+// Convert SVG to EPS
+function convertSVGToEPS(svgString: string): string {
+  let epsData = "";
+  const parser = new DOMParser();
+  const svgDoc = parser.parseFromString(svgString, "image/svg+xml");
+
+  // Check for parsing errors
+  const parseError = svgDoc.querySelector("parsererror");
+  if (parseError) {
+    console.error("SVG parse error:", parseError.textContent);
+    throw new Error("Failed to parse SVG");
+  }
+
+  // Extract Paths
+  const paths = svgDoc.querySelectorAll("path");
+  console.log(`Found ${paths.length} paths in SVG`);
+  
+  if (paths.length > 0) {
+    paths.forEach((path, index) => {
+      const d = path.getAttribute("d");
+      if (d) {
+        const fillColor = path.getAttribute("fill") || "#000000";
+        const strokeColor = path.getAttribute("stroke");
+        
+        // Convert hex color to RGB values for PostScript
+        const rgbFill = hexToRgb(fillColor);
+        
+        epsData += `% Path ${index + 1}\n`;
+        
+        // Set fill color if available
+        if (rgbFill) {
+          epsData += `${rgbFill.r / 255} ${rgbFill.g / 255} ${rgbFill.b / 255} setrgbcolor\n`;
+        }
+        
+        // Improved path conversion
+        epsData += `newpath\n`;
+        epsData += convertSVGPathToEPS(d);
+        
+        // Apply fill and/or stroke
+        if (strokeColor && strokeColor !== "none") {
+          epsData += "gsave\n";
+          const rgbStroke = hexToRgb(strokeColor);
+          if (rgbStroke) {
+            epsData += `${rgbStroke.r / 255} ${rgbStroke.g / 255} ${rgbStroke.b / 255} setrgbcolor\n`;
+          }
+          epsData += "stroke\ngrestore\n";
+        }
+        
+        if (fillColor && fillColor !== "none") {
+          epsData += "fill\n";
+        } else {
+          epsData += "stroke\n";
+        }
+      }
+    });
+  } else {
+    // Handle rectangles, circles, etc. if no paths found
+    console.log("No paths found, looking for other SVG elements");
+    
+    // Handle rectangles
+    const rects = svgDoc.querySelectorAll("rect");
+    rects.forEach((rect, index) => {
+      const x = parseFloat(rect.getAttribute("x") || "0");
+      const y = parseFloat(rect.getAttribute("y") || "0");
+      const width = parseFloat(rect.getAttribute("width") || "0");
+      const height = parseFloat(rect.getAttribute("height") || "0");
+      const fillColor = rect.getAttribute("fill") || "#000000";
+      
+      const rgbFill = hexToRgb(fillColor);
+      
+      epsData += `% Rectangle ${index + 1}\n`;
+      if (rgbFill) {
+        epsData += `${rgbFill.r / 255} ${rgbFill.g / 255} ${rgbFill.b / 255} setrgbcolor\n`;
+      }
+      
+      epsData += `newpath\n${x} ${y} moveto\n`;
+      epsData += `${x + width} ${y} lineto\n`;
+      epsData += `${x + width} ${y + height} lineto\n`;
+      epsData += `${x} ${y + height} lineto\n`;
+      epsData += `closepath\nfill\n`;
+    });
+    
+    // Handle circles
+    const circles = svgDoc.querySelectorAll("circle");
+    circles.forEach((circle, index) => {
+      const cx = parseFloat(circle.getAttribute("cx") || "0");
+      const cy = parseFloat(circle.getAttribute("cy") || "0");
+      const r = parseFloat(circle.getAttribute("r") || "0");
+      const fillColor = circle.getAttribute("fill") || "#000000";
+      
+      const rgbFill = hexToRgb(fillColor);
+      
+      epsData += `% Circle ${index + 1}\n`;
+      if (rgbFill) {
+        epsData += `${rgbFill.r / 255} ${rgbFill.g / 255} ${rgbFill.b / 255} setrgbcolor\n`;
+      }
+      
+      epsData += `newpath\n${cx} ${cy} ${r} 0 360 arc\nclosepath\nfill\n`;
+    });
+  }
+  
+  // If we still don't have any content, create a simple placeholder
+  if (epsData.trim() === "") {
+    console.warn("No SVG elements found, creating placeholder");
+    epsData += `% Placeholder shape\nnewpath\n-100 -100 moveto\n100 -100 lineto\n100 100 lineto\n-100 100 lineto\nclosepath\n0.5 setgray\nfill\n`;
+  }
+  
+  return epsData;
+}
+
+// Convert SVG path to EPS commands using improved regex
+function convertSVGPathToEPS(d: string): string {
+  return d
     .replace(/([Mm])\s*([0-9.-]+)[,\s]([0-9.-]+)/g, (_, cmd, x, y) => 
       `${x} ${y} ${cmd === 'm' ? 'rmoveto' : 'moveto'}\n`)
     .replace(/([Ll])\s*([0-9.-]+)[,\s]([0-9.-]+)/g, (_, cmd, x, y) => 
       `${x} ${y} ${cmd === 'l' ? 'rlineto' : 'lineto'}\n`)
     .replace(/([Zz])/g, 'closepath\n')
     .replace(/([Cc])\s*([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)/g, 
-      (_, cmd, x1, y1, x2, y2, x, y) => `${x1} ${y1} ${x2} ${y2} ${x} ${y} curveto\n`)
-    .replace(/([Aa])\s*([0-9.-]+)[,\s]([0-9.-]+)\s+([0-9.-]+)\s+([01])[,\s]([01])[,\s]([0-9.-]+)[,\s]([0-9.-]+)/g, 
-      (_, cmd, rx, ry, xAxisRotation, largeArcFlag, sweepFlag, x, y) => 
-      `% Arc path (approximated): ${rx} ${ry} ${xAxisRotation} ${largeArcFlag} ${sweepFlag} ${x} ${y}\n${x} ${y} lineto\n`);
-};
+      (_, cmd, x1, y1, x2, y2, x, y) => `${x1} ${y1} ${x2} ${y2} ${x} ${y} curveto\n`);
+}
 
 // Helper function to convert hex color to RGB
 const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
@@ -837,78 +780,3 @@ export const createZipPackage = async (files: ProcessedFile[]): Promise<Blob> =>
           folder.file(file.filename, file.data);
           console.log(`Added ${file.filename} to ${format} folder`);
         });
-      } else {
-        console.error(`Could not create folder: ${format}`);
-      }
-    });
-    
-    // Add a simple readme file
-    zip.file("README.txt", 
-      "This logo package was generated by AI Logo Package Exporter.\n\n" +
-      "FORMATS INCLUDED:\n" +
-      "- PNG: For web and general usage (with transparency)\n" +
-      "- JPG: For web and general usage (without transparency)\n" +
-      "- SVG: Vector format for scaling without quality loss\n" +
-      "- PDF: For print and professional usage\n" +
-      "- EPS: For professional print usage\n" +
-      "- ICO: For website favicons\n\n" +
-      "For questions or customizations, please contact support."
-    );
-    
-    // Generate ZIP file
-    console.log('Generating final ZIP file...');
-    return await zip.generateAsync({ 
-      type: 'blob',
-      compression: 'DEFLATE',
-      compressionOptions: {
-        level: 6
-      }
-    });
-  } catch (error) {
-    console.error('Error creating ZIP package:', error);
-    throw error;
-  }
-};
-
-export const downloadZip = (blob: Blob, brandName: string) => {
-  console.log('Preparing to download ZIP file...');
-  try {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${brandName}_Logo_Package.zip`;
-    document.body.appendChild(link);
-    
-    console.log('Triggering download...');
-    link.click();
-    
-    // Clean up
-    document.body.removeChild(link);
-    setTimeout(() => {
-      URL.revokeObjectURL(url);
-    }, 100);
-    
-    console.log('Download initiated successfully');
-  } catch (error) {
-    console.error('Error downloading ZIP:', error);
-    throw error;
-  }
-};
-
-// Export this function for testing
-export const testZipDownload = () => {
-  const zip = new JSZip();
-  zip.file("test.txt", "This is a test file");
-  
-  zip.generateAsync({ type: "blob" })
-    .then(blob => {
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'test.zip';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    });
-};
