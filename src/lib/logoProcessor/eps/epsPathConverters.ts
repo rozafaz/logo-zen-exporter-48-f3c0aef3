@@ -1,4 +1,3 @@
-
 import { setPostScriptColor, convertSvgTransform } from './epsSvgHelpers';
 
 /**
@@ -222,7 +221,7 @@ export const convertPathToPostScript = (
 };
 
 /**
- * Convert different SVG elements to PostScript
+ * Convert different SVG elements to PostScript with improved precision
  */
 export const convertElementsToPostScript = (
   elements: Element[],
@@ -270,7 +269,10 @@ export const convertElementsToPostScript = (
         output += setPostScriptColor(pathStroke);
         // Set stroke width if specified
         if (strokeWidth) {
-          output += `${String(parseFloat(strokeWidth))} setlinewidth\n`;
+          const parsedWidth = parseFloat(strokeWidth);
+          if (!isNaN(parsedWidth)) {
+            output += `${parsedWidth.toFixed(3)} setlinewidth\n`;
+          }
         }
         // Draw the path again for the stroke (if already filled)
         if (pathFill && pathFill !== 'none') {
@@ -360,7 +362,10 @@ export const convertElementsToPostScript = (
       if (rectStroke && rectStroke !== 'none') {
         output += setPostScriptColor(rectStroke);
         if (strokeWidth) {
-          output += `${String(parseFloat(strokeWidth))} setlinewidth\n`;
+          const parsedWidth = parseFloat(strokeWidth);
+          if (!isNaN(parsedWidth)) {
+            output += `${parsedWidth.toFixed(3)} setlinewidth\n`;
+          }
         }
         output += 'stroke\n';
       } else if (!rectFill || rectFill === 'none') {
@@ -402,7 +407,10 @@ export const convertElementsToPostScript = (
       if (circleStroke && circleStroke !== 'none') {
         output += setPostScriptColor(circleStroke);
         if (strokeWidth) {
-          output += `${String(parseFloat(strokeWidth))} setlinewidth\n`;
+          const parsedWidth = parseFloat(strokeWidth);
+          if (!isNaN(parsedWidth)) {
+            output += `${parsedWidth.toFixed(3)} setlinewidth\n`;
+          }
         }
         output += 'stroke\n';
       } else if (!circleFill || circleFill === 'none') {
@@ -438,7 +446,7 @@ export const convertElementsToPostScript = (
       // Move to center, scale, draw circle, restore scale
       output += `${cx.toFixed(3)} ${psY.toFixed(3)} translate\n`;
       output += `${rx.toFixed(3)} ${ry.toFixed(3)} scale\n`;
-      output += '0 0 1 0 360 arc\n';  // Fixed: changed the mismatched quotes
+      output += '0 0 1 0 360 arc\n';  // Fixed: consistent quotes
       output += `${(1/rx).toFixed(6)} ${(1/ry).toFixed(6)} scale\n`;
       output += `${(-cx).toFixed(3)} ${(-psY).toFixed(3)} translate\n`;
       output += 'closepath\n';
@@ -451,7 +459,10 @@ export const convertElementsToPostScript = (
       if (ellipseStroke && ellipseStroke !== 'none') {
         output += setPostScriptColor(ellipseStroke);
         if (strokeWidth) {
-          output += `${String(parseFloat(strokeWidth))} setlinewidth\n`;
+          const parsedWidth = parseFloat(strokeWidth);
+          if (!isNaN(parsedWidth)) {
+            output += `${parsedWidth.toFixed(3)} setlinewidth\n`;
+          }
         }
         output += 'stroke\n';
       } else if (!ellipseFill || ellipseFill === 'none') {
@@ -484,7 +495,10 @@ export const convertElementsToPostScript = (
       
       // Set stroke width if specified
       if (strokeWidth) {
-        output += `${String(parseFloat(strokeWidth))} setlinewidth\n`;
+        const parsedWidth = parseFloat(strokeWidth);
+        if (!isNaN(parsedWidth)) {
+          output += `${parsedWidth.toFixed(3)} setlinewidth\n`;
+        }
       }
       
       output += 'stroke\n';
@@ -539,7 +553,10 @@ export const convertElementsToPostScript = (
       if (stroke && stroke !== 'none') {
         output += setPostScriptColor(stroke);
         if (strokeWidth) {
-          output += `${String(parseFloat(strokeWidth))} setlinewidth\n`;
+          const parsedWidth = parseFloat(strokeWidth);
+          if (!isNaN(parsedWidth)) {
+            output += `${parsedWidth.toFixed(3)} setlinewidth\n`;
+          }
         }
         output += 'stroke\n';
       } else if (!fill || fill === 'none') {

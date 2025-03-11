@@ -1,11 +1,17 @@
 
 /**
- * Create EPS file header with bounding box
+ * Create EPS file header with improved bounding box
+ * Adds a small padding to prevent clipping
  */
 export const createEpsHeader = (width: number, height: number): string => {
+  // Add padding to bounding box to prevent clipping
+  const padding = Math.max(10, Math.min(width, height) * 0.05);
+  const bbWidth = Math.ceil(width + padding * 2);
+  const bbHeight = Math.ceil(height + padding * 2);
+  
   return `%!PS-Adobe-3.0 EPSF-3.0
-%%BoundingBox: 0 0 ${Math.ceil(width)} ${Math.ceil(height)}
-%%HiResBoundingBox: 0.0 0.0 ${width.toFixed(3)} ${height.toFixed(3)}
+%%BoundingBox: -${Math.ceil(padding)} -${Math.ceil(padding)} ${bbWidth} ${bbHeight}
+%%HiResBoundingBox: -${padding.toFixed(3)} -${padding.toFixed(3)} ${(width + padding * 2).toFixed(3)} ${(height + padding * 2).toFixed(3)}
 %%Creator: Logo Package Generator
 %%Title: Vector Logo
 %%DocumentData: Clean7Bit
@@ -68,17 +74,21 @@ export const createEpsHeader = (width: number, height: number): string => {
   0 0 1 0 360 arc
   setmatrix
 } def
+
+% Higher quality settings for better path rendering
+2 setlinecap
+2 setlinejoin
+0.5 setlinewidth
 %%EndProlog
 
 %%BeginSetup
 << /PageSize [${width} ${height}] >> setpagedevice
-1 setlinecap
-1 setlinejoin
-10 setmiterlimit
 %%EndSetup
 
 %%Page: 1 1
 %%BeginPageSetup
+% Translate by padding amount to ensure everything is visible
+${padding} ${padding} translate
 %%EndPageSetup
 
 `;

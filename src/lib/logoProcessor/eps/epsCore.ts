@@ -3,9 +3,10 @@ import type { ProcessedFile } from '../types';
 import { getSvgDimensions, prepareSvgElement } from './epsSvgHelpers';
 import { createEpsHeader, createEpsFooter, setPostScriptColor, createPlaceholderShape, createFallbackEps } from './epsFormatters';
 import { convertPathToPostScript, convertElementsToPostScript } from './epsPathConverters';
+import { optimizeSvgPaths } from '../svgUtils';
 
 /**
- * Creates an EPS file from SVG content
+ * Creates an EPS file from SVG content with improved precision
  */
 export const createEpsFromSvg = async (
   svgText: string,
@@ -17,8 +18,11 @@ export const createEpsFromSvg = async (
   try {
     console.log('Generating EPS file from SVG for', color);
     
-    // Generate EPS content from SVG
-    const epsContent = convertSvgToEps(svgText, color);
+    // Pre-process and optimize SVG for better conversion
+    const optimizedSvg = optimizeSvgPaths(svgText);
+    
+    // Generate EPS content from optimized SVG
+    const epsContent = convertSvgToEps(optimizedSvg, color);
     
     // Create EPS file as a Blob
     const epsBlob = new Blob([epsContent], { type: 'application/postscript' });
@@ -44,11 +48,11 @@ export const createEpsFromSvg = async (
 };
 
 /**
- * Convert SVG content to EPS format
+ * Convert SVG content to EPS format with improved accuracy
  */
 export const convertSvgToEps = (svgContent: string, color: string): string => {
   try {
-    console.log('Starting SVG to EPS conversion');
+    console.log('Starting SVG to EPS conversion with improved precision');
     
     // Parse SVG
     const parser = new DOMParser();
@@ -78,7 +82,7 @@ export const convertSvgToEps = (svgContent: string, color: string): string => {
     else if (color === 'White') fillColor = '#FFFFFF';
     else if (color === 'Grayscale') fillColor = '#808080';
     
-    // Generate EPS header with proper dimensions
+    // Generate EPS header with proper dimensions and padding
     let epsContent = createEpsHeader(dimensions.width, dimensions.height);
     
     // Process all SVG elements and convert to PostScript commands
@@ -93,47 +97,47 @@ export const convertSvgToEps = (svgContent: string, color: string): string => {
     console.log(`Found SVG elements: ${paths.length} paths, ${rects.length} rects, ${circles.length} circles, ` +
                 `${ellipses.length} ellipses, ${lines.length} lines, ${polylines.length} polylines, ${polygons.length} polygons`);
     
-    // We'll handle the coordinate system differently to ensure correct rendering
+    // Setup for SVG coordinate system transformation
     epsContent += `% Setup for SVG coordinate system (origin at top-left)\n`;
     epsContent += `gsave\n\n`;
     
-    // Convert paths to PostScript
+    // Set default line attributes for better quality
+    epsContent += `1 setlinecap\n`;
+    epsContent += `1 setlinejoin\n`;
+    epsContent += `0.5 setlinewidth\n\n`;
+    
+    // Convert paths to PostScript with improved precision
     if (paths.length > 0) {
       console.log('Processing SVG paths...');
       epsContent += convertElementsToPostScript(paths, fillColor, dimensions.height);
     }
     
-    // Convert rectangles to PostScript
+    // Convert other elements
     if (rects.length > 0) {
       console.log('Processing SVG rectangles...');
       epsContent += convertElementsToPostScript(rects, fillColor, dimensions.height, 'rect');
     }
     
-    // Convert circles to PostScript
     if (circles.length > 0) {
       console.log('Processing SVG circles...');
       epsContent += convertElementsToPostScript(circles, fillColor, dimensions.height, 'circle');
     }
     
-    // Convert ellipses to PostScript
     if (ellipses.length > 0) {
       console.log('Processing SVG ellipses...');
       epsContent += convertElementsToPostScript(ellipses, fillColor, dimensions.height, 'ellipse');
     }
     
-    // Convert lines to PostScript
     if (lines.length > 0) {
       console.log('Processing SVG lines...');
       epsContent += convertElementsToPostScript(lines, fillColor, dimensions.height, 'line');
     }
     
-    // Convert polylines to PostScript
     if (polylines.length > 0) {
       console.log('Processing SVG polylines...');
       epsContent += convertElementsToPostScript(polylines, fillColor, dimensions.height, 'polyline');
     }
     
-    // Convert polygons to PostScript
     if (polygons.length > 0) {
       console.log('Processing SVG polygons...');
       epsContent += convertElementsToPostScript(polygons, fillColor, dimensions.height, 'polygon');
@@ -172,6 +176,20 @@ const transformSvgForEps = (svgDoc: Document, svgHeight: number): void => {
     // Ensure path has proper attributes
     if (!path.hasAttribute('fill') && !path.hasAttribute('stroke')) {
       path.setAttribute('fill', '#000000');
+    }
+    
+    // Set line join and cap for better quality
+    if (path.hasAttribute('stroke') && path.getAttribute('stroke') !== 'none') {
+      if (!path.hasAttribute('stroke-linecap')) {
+        path.setAttribute('stroke-linecap', 'round');
+      }
+      if (!path.hasAttribute('stroke-linejoin')) {
+        path.setAttribute('stroke-linejoin', 'round');
+      }
+      // Ensure stroke width is specified
+      if (!path.hasAttribute('stroke-width')) {
+        path.setAttribute('stroke-width', '0.5');
+      }
     }
     
     // Preserve original data for debugging
@@ -217,5 +235,23 @@ const transformSvgForEps = (svgDoc: Document, svgHeight: number): void => {
     if (group.hasAttribute('transform')) {
       group.setAttribute('data-group-transform', group.getAttribute('transform') || '');
     }
+  });
+  
+  // Fix line style attributes for other elements
+  ['rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon'].forEach(selector => {
+    const elements = svgDoc.querySelectorAll(selector);
+    elements.forEach(el => {
+      if (el.hasAttribute('stroke') && el.getAttribute('stroke') !== 'none') {
+        if (!el.hasAttribute('stroke-linecap')) {
+          el.setAttribute('stroke-linecap', 'round');
+        }
+        if (!el.hasAttribute('stroke-linejoin')) {
+          el.setAttribute('stroke-linejoin', 'round');
+        }
+        if (!el.hasAttribute('stroke-width')) {
+          el.setAttribute('stroke-width', '0.5');
+        }
+      }
+    });
   });
 };
