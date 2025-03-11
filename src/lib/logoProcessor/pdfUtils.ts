@@ -1,4 +1,3 @@
-
 import { PDFDocument, rgb } from 'pdf-lib';
 import { getPostScriptColor } from './vectorUtils';
 import { createPostScriptHeader, createPostScriptFooter } from './postscriptUtils';
@@ -226,37 +225,69 @@ export const convertPdfToEps = async (pdfBlob: Blob): Promise<Blob> => {
 1 setlinewidth
 0 setlinecap
 0 setlinejoin
-1 1 1 setrgbcolor % Set default color to white
+0 0 0 setrgbcolor % Set default color to black
 
 % Begin vector content
 `;
 
-    // Extract paths from PDF and convert to PostScript commands
-    const paths = await page.getPaths();
-    for (const path of paths) {
-      const operations = path.getOperations();
-      for (const op of operations) {
-        switch (op.operator) {
-          case 'm':
-            epsContent += `${op.args[0]} ${op.args[1]} moveto\n`;
-            break;
-          case 'l':
-            epsContent += `${op.args[0]} ${op.args[1]} lineto\n`;
-            break;
-          case 'c':
-            epsContent += `${op.args[0]} ${op.args[1]} ${op.args[2]} ${op.args[3]} ${op.args[4]} ${op.args[5]} curveto\n`;
-            break;
-          case 'h':
+    // Since pdf-lib doesn't expose a direct getPaths() method,
+    // we'll extract path data from the SVG created from the PDF
+    // This is a workaround since we can't directly access PDF operators
+    try {
+      // Extract SVG content from the PDF blob
+      const pdfText = await pdfBlob.text();
+      const svgContent = extractSvgFromPdf(pdfText);
+      
+      if (svgContent) {
+        // Convert SVG paths to PostScript commands
+        const parser = new DOMParser();
+        const svgDoc = parser.parseFromString(svgContent, "image/svg+xml");
+        
+        // Process paths
+        const paths = svgDoc.querySelectorAll('path');
+        paths.forEach((path, index) => {
+          const d = path.getAttribute('d');
+          if (d) {
+            epsContent += `% Path ${index + 1}\n`;
+            epsContent += `newpath\n`;
+            // Convert path data to PostScript
+            epsContent += convertPathToPostScript(d, height);
             epsContent += `closepath\n`;
-            break;
-          case 'f':
             epsContent += `fill\n`;
-            break;
-          case 's':
-            epsContent += `stroke\n`;
-            break;
-        }
+          }
+        });
+        
+        // Process rectangles
+        const rects = svgDoc.querySelectorAll('rect');
+        rects.forEach((rect, index) => {
+          const x = parseFloat(rect.getAttribute('x') || '0');
+          const y = parseFloat(rect.getAttribute('y') || '0');
+          const rectWidth = parseFloat(rect.getAttribute('width') || '0');
+          const rectHeight = parseFloat(rect.getAttribute('height') || '0');
+          
+          epsContent += `% Rectangle ${index + 1}\n`;
+          epsContent += `newpath\n`;
+          epsContent += `${x} ${height - y - rectHeight} moveto\n`; // Flip Y coordinates
+          epsContent += `${x + rectWidth} ${height - y - rectHeight} lineto\n`;
+          epsContent += `${x + rectWidth} ${height - y} lineto\n`;
+          epsContent += `${x} ${height - y} lineto\n`;
+          epsContent += `closepath\n`;
+          epsContent += `fill\n`;
+        });
       }
+    } catch (svgError) {
+      console.warn('Error extracting SVG from PDF:', svgError);
+      
+      // Fallback: Create a simple rectangle representing the page
+      epsContent += `% Fallback shape - page representation\n`;
+      epsContent += `newpath\n`;
+      epsContent += `0 0 moveto\n`;
+      epsContent += `${width} 0 lineto\n`;
+      epsContent += `${width} ${height} lineto\n`;
+      epsContent += `0 ${height} lineto\n`;
+      epsContent += `closepath\n`;
+      epsContent += `0.9 setgray\n`; // Light gray
+      epsContent += `fill\n`;
     }
 
     // Add footer
@@ -271,4 +302,101 @@ export const convertPdfToEps = async (pdfBlob: Blob): Promise<Blob> => {
     throw error;
   }
 };
+
+// Helper function to extract SVG content from PDF text
+function extractSvgFromPdf(pdfText: string): string | null {
+  // Look for SVG content that might be embedded in the PDF
+  const svgStartMatch = pdfText.match(/<svg[^>]*>/i);
+  const svgEndMatch = pdfText.match(/<\/svg>/i);
+  
+  if (svgStartMatch && svgEndMatch) {
+    const startIndex = svgStartMatch.index;
+    const endIndex = svgEndMatch.index! + 6; // Length of </svg>
+    if (startIndex !== undefined && endIndex !== undefined) {
+      return pdfText.substring(startIndex, endIndex);
+    }
+  }
+  
+  return null;
+}
+
+// Convert SVG path data to PostScript commands
+function convertPathToPostScript(d: string, height: number): string {
+  let result = '';
+  
+  // Normalize path data
+  const normalizedPath = d
+    .replace(/([MLHVCSQTAZmlhvcsqtaz])/g, ' $1 ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  const tokens = normalizedPath.split(' ');
+  let currentX = 0;
+  let currentY = 0;
+  
+  let i = 0;
+  while (i < tokens.length) {
+    const token = tokens[i];
+    if (/[MLHVCSQTAZmlhvcsqtaz]/.test(token)) {
+      const command = token;
+      i++;
+      
+      switch (command.toUpperCase()) {
+        case 'M': // moveto
+          const x = parseFloat(tokens[i++]);
+          const y = parseFloat(tokens[i++]);
+          currentX = command === 'M' ? x : currentX + x;
+          currentY = command === 'M' ? y : currentY + y;
+          // Flip Y coordinates for PostScript
+          result += `${currentX} ${height - currentY} moveto\n`;
+          break;
+          
+        case 'L': // lineto
+          const lx = parseFloat(tokens[i++]);
+          const ly = parseFloat(tokens[i++]);
+          currentX = command === 'L' ? lx : currentX + lx;
+          currentY = command === 'L' ? ly : currentY + ly;
+          result += `${currentX} ${height - currentY} lineto\n`;
+          break;
+          
+        case 'C': // curveto
+          const c1x = parseFloat(tokens[i++]);
+          const c1y = parseFloat(tokens[i++]);
+          const c2x = parseFloat(tokens[i++]);
+          const c2y = parseFloat(tokens[i++]);
+          const ex = parseFloat(tokens[i++]);
+          const ey = parseFloat(tokens[i++]);
+          
+          // Handle absolute vs relative coordinates
+          const cp1x = command === 'C' ? c1x : currentX + c1x;
+          const cp1y = command === 'C' ? c1y : currentY + c1y;
+          const cp2x = command === 'C' ? c2x : currentX + c2x;
+          const cp2y = command === 'C' ? c2y : currentY + c2y;
+          const endX = command === 'C' ? ex : currentX + ex;
+          const endY = command === 'C' ? ey : currentY + ey;
+          
+          currentX = endX;
+          currentY = endY;
+          
+          // Flip Y coordinates for PostScript
+          result += `${cp1x} ${height - cp1y} ${cp2x} ${height - cp2y} ${endX} ${height - endY} curveto\n`;
+          break;
+          
+        case 'Z': // closepath
+          result += `closepath\n`;
+          i++;
+          break;
+          
+        default:
+          // Skip unsupported commands
+          i++;
+          break;
+      }
+    } else {
+      i++;
+    }
+  }
+  
+  return result;
+}
 
