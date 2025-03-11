@@ -1,4 +1,3 @@
-
 import { setPostScriptColor } from './epsSvgHelpers';
 
 /**
@@ -38,7 +37,7 @@ export const convertPathToPostScript = (pathData: string): string => {
           if (!isNaN(x) && !isNaN(y)) {
             currentX = token === 'M' ? x : currentX + x;
             currentY = token === 'M' ? y : currentY + y;
-            output += `${currentX} ${currentY} moveto\n`;
+            output += `${currentX.toString()} ${currentY.toString()} moveto\n`;
             firstX = currentX;
             firstY = currentY;
           }
@@ -53,7 +52,7 @@ export const convertPathToPostScript = (pathData: string): string => {
           if (!isNaN(x) && !isNaN(y)) {
             currentX = token === 'L' ? x : currentX + x;
             currentY = token === 'L' ? y : currentY + y;
-            output += `${currentX} ${currentY} lineto\n`;
+            output += `${currentX.toString()} ${currentY.toString()} lineto\n`;
           }
         }
         break;
@@ -64,7 +63,7 @@ export const convertPathToPostScript = (pathData: string): string => {
           
           if (!isNaN(x)) {
             currentX = token === 'H' ? x : currentX + x;
-            output += `${currentX} ${currentY} lineto\n`;
+            output += `${currentX.toString()} ${currentY.toString()} lineto\n`;
           }
         }
         break;
@@ -75,7 +74,7 @@ export const convertPathToPostScript = (pathData: string): string => {
           
           if (!isNaN(y)) {
             currentY = token === 'V' ? y : currentY + y;
-            output += `${currentX} ${currentY} lineto\n`;
+            output += `${currentX.toString()} ${currentY.toString()} lineto\n`;
           }
         }
         break;
@@ -99,7 +98,7 @@ export const convertPathToPostScript = (pathData: string): string => {
             currentX = token === 'C' ? x : currentX + x;
             currentY = token === 'C' ? y : currentY + y;
             
-            output += `${cx1} ${cy1} ${cx2} ${cy2} ${currentX} ${currentY} curveto\n`;
+            output += `${cx1.toString()} ${cy1.toString()} ${cx2.toString()} ${cy2.toString()} ${currentX.toString()} ${currentY.toString()} curveto\n`;
           }
         }
         break;
@@ -304,3 +303,4 @@ export const convertElementsToPostScript = (
   
   return output;
 };
+
