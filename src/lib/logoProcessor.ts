@@ -1,3 +1,4 @@
+
 import JSZip from 'jszip';
 import { PDFDocument } from 'pdf-lib';
 import type { ExportSettings } from '@/components/ExportOptions';
@@ -757,6 +758,47 @@ const createPdfFromSvg = async (svgString: string): Promise<Blob> => {
   }
 };
 
+// Function to create a PDF from an image data URL
+const createPdfFromImage = async (imageDataUrl: string): Promise<Blob> => {
+  try {
+    // Create a new PDF document
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([600, 600]);
+    
+    // Embed the image into the PDF
+    const imgData = await fetch(imageDataUrl).then(res => res.arrayBuffer());
+    const img = await pdfDoc.embedPng(imgData);
+    
+    // Calculate dimensions to maintain aspect ratio
+    const imgDims = img.scale(1);
+    const scale = Math.min(500 / imgDims.width, 500 / imgDims.height);
+    
+    // Center the image on the page
+    const x = (600 - imgDims.width * scale) / 2;
+    const y = (600 - imgDims.height * scale) / 2;
+    
+    // Draw the image
+    page.drawImage(img, {
+      x,
+      y,
+      width: imgDims.width * scale,
+      height: imgDims.height * scale,
+    });
+    
+    // Save the PDF to bytes
+    const pdfBytes = await pdfDoc.save();
+    
+    // Create a Blob from the PDF bytes
+    const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+    
+    console.log('PDF created successfully from image, size:', pdfBlob.size, 'bytes');
+    return pdfBlob;
+  } catch (error) {
+    console.error('Error in createPdfFromImage:', error);
+    throw error;
+  }
+};
+
 export const createZipPackage = async (files: ProcessedFile[]): Promise<Blob> => {
   console.log('Creating ZIP package...');
   try {
@@ -780,3 +822,86 @@ export const createZipPackage = async (files: ProcessedFile[]): Promise<Blob> =>
           folder.file(file.filename, file.data);
           console.log(`Added ${file.filename} to ${format} folder`);
         });
+      }
+    });
+    
+    // Generate zip file
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    console.log(`ZIP package created successfully, size: ${zipBlob.size} bytes`);
+    
+    return zipBlob;
+  } catch (error) {
+    console.error('Error creating ZIP package:', error);
+    throw error;
+  }
+};
+
+export const downloadZip = (zipBlob: Blob, brandName: string): void => {
+  try {
+    // Create a URL for the blob
+    const url = URL.createObjectURL(zipBlob);
+    
+    // Create a temporary anchor element
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${brandName}_LogoPackage.zip`;
+    
+    // Append to the document, click, and clean up
+    document.body.appendChild(a);
+    a.click();
+    
+    // Clean up
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    console.log('Download initiated for ZIP file');
+  } catch (error) {
+    console.error('Error downloading ZIP:', error);
+    throw error;
+  }
+};
+
+// Function for testing ZIP download (for development)
+export const testZipDownload = (): void => {
+  try {
+    console.log('Testing ZIP download...');
+    
+    const zip = new JSZip();
+    
+    // Add a text file for testing
+    zip.file('test.txt', 'This is a test file for ZIP download functionality.');
+    
+    // Add a small SVG
+    const testSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50">
+      <circle cx="25" cy="25" r="20" fill="blue" />
+    </svg>`;
+    
+    zip.file('test.svg', testSvg);
+    
+    // Generate and download the ZIP
+    zip.generateAsync({ type: 'blob' }).then(blob => {
+      // Create a URL for the blob
+      const url = URL.createObjectURL(blob);
+      
+      // Create a temporary anchor element
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'test_download.zip';
+      
+      // Append to the document, click, and clean up
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      console.log('Test ZIP download complete');
+    }).catch(err => {
+      console.error('Error in test ZIP download:', err);
+    });
+  } catch (error) {
+    console.error('Error testing ZIP download:', error);
+    throw error;
+  }
+};
