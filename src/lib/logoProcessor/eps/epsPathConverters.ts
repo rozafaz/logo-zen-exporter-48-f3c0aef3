@@ -4,7 +4,7 @@ import { setPostScriptColor } from './epsSvgHelpers';
 /**
  * Convert SVG path data to PostScript commands
  */
-export const convertPathToPostScript = (pathData: string): string => {
+export const convertPathToPostScript = (pathData: string, flipY: boolean = true, height: number = 0): string => {
   let output = 'newpath\n';
   let currentX = 0;
   let currentY = 0;
@@ -25,6 +25,10 @@ export const convertPathToPostScript = (pathData: string): string => {
   const tokens = normalizedPath.split(' ');
   let i = 0;
   
+  const transformY = (y: number): number => {
+    return flipY ? height - y : y;
+  };
+  
   while (i < tokens.length) {
     const token = tokens[i++];
     if (!token || token === '') continue;
@@ -38,9 +42,10 @@ export const convertPathToPostScript = (pathData: string): string => {
           if (!isNaN(x) && !isNaN(y)) {
             currentX = token === 'M' ? x : currentX + x;
             currentY = token === 'M' ? y : currentY + y;
-            output += `${currentX.toString()} ${currentY.toString()} moveto\n`;
+            const transformedY = transformY(currentY);
+            output += `${currentX.toString()} ${transformedY.toString()} moveto\n`;
             firstX = currentX;
-            firstY = currentY;
+            firstY = transformedY;
           }
         }
         break;
@@ -53,7 +58,8 @@ export const convertPathToPostScript = (pathData: string): string => {
           if (!isNaN(x) && !isNaN(y)) {
             currentX = token === 'L' ? x : currentX + x;
             currentY = token === 'L' ? y : currentY + y;
-            output += `${currentX.toString()} ${currentY.toString()} lineto\n`;
+            const transformedY = transformY(currentY);
+            output += `${currentX.toString()} ${transformedY.toString()} lineto\n`;
           }
         }
         break;
@@ -64,7 +70,7 @@ export const convertPathToPostScript = (pathData: string): string => {
           
           if (!isNaN(x)) {
             currentX = token === 'H' ? x : currentX + x;
-            output += `${currentX.toString()} ${currentY.toString()} lineto\n`;
+            output += `${currentX.toString()} ${transformY(currentY).toString()} lineto\n`;
           }
         }
         break;
@@ -75,7 +81,7 @@ export const convertPathToPostScript = (pathData: string): string => {
           
           if (!isNaN(y)) {
             currentY = token === 'V' ? y : currentY + y;
-            output += `${currentX.toString()} ${currentY.toString()} lineto\n`;
+            output += `${currentX.toString()} ${transformY(currentY).toString()} lineto\n`;
           }
         }
         break;
@@ -99,7 +105,7 @@ export const convertPathToPostScript = (pathData: string): string => {
             currentX = token === 'C' ? x : currentX + x;
             currentY = token === 'C' ? y : currentY + y;
             
-            output += `${cx1.toString()} ${cy1.toString()} ${cx2.toString()} ${cy2.toString()} ${currentX.toString()} ${currentY.toString()} curveto\n`;
+            output += `${cx1.toString()} ${transformY(cy1).toString()} ${cx2.toString()} ${transformY(cy2).toString()} ${currentX.toString()} ${transformY(currentY).toString()} curveto\n`;
           }
         }
         break;
@@ -122,7 +128,7 @@ export const convertPathToPostScript = (pathData: string): string => {
             currentX = token === 'S' ? x : currentX + x;
             currentY = token === 'S' ? y : currentY + y;
             
-            output += `${cx1.toString()} ${cy1.toString()} ${cx2.toString()} ${cy2.toString()} ${currentX.toString()} ${currentY.toString()} curveto\n`;
+            output += `${cx1.toString()} ${transformY(cy1).toString()} ${cx2.toString()} ${transformY(cy2).toString()} ${currentX.toString()} ${transformY(currentY).toString()} curveto\n`;
           }
         }
         break;
@@ -152,7 +158,7 @@ export const convertPathToPostScript = (pathData: string): string => {
             currentX = qx;
             currentY = qy;
             
-            output += `${cx1.toString()} ${cy1.toString()} ${cx2.toString()} ${cy2.toString()} ${currentX.toString()} ${currentY.toString()} curveto\n`;
+            output += `${cx1.toString()} ${transformY(cy1).toString()} ${cx2.toString()} ${transformY(cy2).toString()} ${currentX.toString()} ${transformY(currentY).toString()} curveto\n`;
           }
         }
         break;
@@ -207,7 +213,7 @@ export const convertElementsToPostScript = (
       output += setPostScriptColor(pathFill);
       
       // Convert path to PostScript commands
-      output += convertPathToPostScript(pathData);
+      output += convertPathToPostScript(pathData, true, svgHeight);
       
       // Apply fill or stroke
       if (pathFill && pathFill !== 'none') {
@@ -223,7 +229,7 @@ export const convertElementsToPostScript = (
         }
         // Draw the path again for the stroke (if already filled)
         if (pathFill && pathFill !== 'none') {
-          output += convertPathToPostScript(pathData);
+          output += convertPathToPostScript(pathData, true, svgHeight);
         }
         output += 'stroke\n';
       } else if (!pathFill || pathFill === 'none') {
@@ -249,7 +255,8 @@ export const convertElementsToPostScript = (
       // Set color for this rectangle
       output += setPostScriptColor(rectFill);
       
-      // Convert SVG y-coordinate to PostScript y-coordinate (fix the coordinate system)
+      // In PostScript, coordinate system origin is at bottom left
+      // So we need to flip the y-coordinate
       const psY = svgHeight - y - height;
       
       // Create rectangle path, handling rounded corners if specified
@@ -258,13 +265,18 @@ export const convertElementsToPostScript = (
         output += 'newpath\n';
         output += `${(x + rx).toString()} ${psY.toString()} moveto\n`;
         output += `${(x + width - rx).toString()} ${psY.toString()} lineto\n`;
-        output += `${(x + width - rx).toString()} ${psY.toString()} ${rx.toString()} 0 90 arc\n`;
+        // Bottom right corner
+        output += `${(x + width).toString()} ${psY.toString()} ${(x + width).toString()} ${(psY + ry).toString()} ${rx.toString()} arcto 4 {pop} repeat\n`;
         output += `${(x + width).toString()} ${(psY + height - ry).toString()} lineto\n`;
-        output += `${(x + width).toString()} ${(psY + height - ry).toString()} ${ry.toString()} 270 0 arc\n`;
+        // Top right corner
+        output += `${(x + width).toString()} ${(psY + height).toString()} ${(x + width - rx).toString()} ${(psY + height).toString()} ${rx.toString()} arcto 4 {pop} repeat\n`;
         output += `${(x + rx).toString()} ${(psY + height).toString()} lineto\n`;
-        output += `${(x + rx).toString()} ${(psY + height).toString()} ${ry.toString()} 180 270 arc\n`;
+        // Top left corner
+        output += `${x.toString()} ${(psY + height).toString()} ${x.toString()} ${(psY + height - ry).toString()} ${rx.toString()} arcto 4 {pop} repeat\n`;
         output += `${x.toString()} ${(psY + ry).toString()} lineto\n`;
-        output += `${x.toString()} ${(psY + ry).toString()} ${rx.toString()} 90 180 arc\n`;
+        // Bottom left corner
+        output += `${x.toString()} ${psY.toString()} ${(x + rx).toString()} ${psY.toString()} ${rx.toString()} arcto 4 {pop} repeat\n`;
+        output += 'closepath\n';
       } else {
         // Simple rectangle
         output += 'newpath\n';
@@ -298,9 +310,36 @@ export const convertElementsToPostScript = (
       output += 'fill\n';
       
       output += 'grestore\n';
+    } else if (elementType === 'ellipse') {
+      const cx = parseFloat(element.getAttribute('cx') || '0');
+      const cy = parseFloat(element.getAttribute('cy') || '0');
+      const rx = parseFloat(element.getAttribute('rx') || '0');
+      const ry = parseFloat(element.getAttribute('ry') || '0');
+      const ellipseFill = element.getAttribute('fill') || baseFillColor;
+      
+      if (rx <= 0 || ry <= 0) return;
+      
+      output += 'gsave\n';
+      
+      // Set color for this ellipse
+      output += setPostScriptColor(ellipseFill);
+      
+      // Create ellipse by scaling a circle
+      const psY = svgHeight - cy;
+      output += 'newpath\n';
+      output += `${cx.toString()} ${psY.toString()} translate\n`;
+      output += `${rx.toString()} ${ry.toString()} scale\n`;
+      output += '0 0 1 0 360 arc\n';
+      output += '1 1 1 setrgbcolor\n';  // Reset the scaling
+      output += `${(1/rx).toString()} ${(1/ry).toString()} scale\n`;
+      output += `${(-cx).toString()} ${(-psY).toString()} translate\n`;
+      output += 'closepath\n';
+      output += 'fill\n';
+      
+      output += 'grestore\n';
     }
     
-    // Additional element types could be added here (ellipses, polylines, etc.)
+    // Additional element types could be added here (polylines, etc.)
   });
   
   return output;
