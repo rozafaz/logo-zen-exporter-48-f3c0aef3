@@ -1,8 +1,8 @@
 
 import type { ExportSettings, ProcessedFile } from './types';
-import { createPdfFromImage, createPdfFromSvg } from './pdfUtils';
-import { applyBlackFilter, applyWhiteFilter, applyGrayscaleFilter, applyInvertedFilter, modifySvgColor, invertSvgColors } from './colorUtils';
-import { createEpsFromSvg } from './vectorUtils';
+import { processRasterFormats, processIcoFormat } from './rasterUtils';
+import { processSvgFormat, processEpsFromSvg } from './svgUtils';
+import { processPdfFromSvg, processPdfFromRaster } from './pdfProcessor';
 
 export const processLogo = async (
   logoFile: File, 
@@ -50,10 +50,6 @@ export const processLogo = async (
       originalLogo.src = logoUrl;
     });
     
-    // Set canvas size based on the original logo
-    const baseWidth = originalLogo.width || 300; // Fallback size
-    const baseHeight = originalLogo.height || 300; // Fallback size
-    
     // Process each color variation
     for (const color of colors) {
       console.log(`Processing ${color} color variation`);
@@ -61,343 +57,46 @@ export const processLogo = async (
       for (const format of formats) {
         // Handle raster formats (PNG, JPG)
         if (['PNG', 'JPG'].includes(format)) {
-          console.log(`Generating ${format} files for ${color}`);
-          
-          for (const resolution of resolutions) {
-            try {
-              // Set DPI-based scaling
-              let scaleFactor = 1;
-              if (resolution === '300dpi') {
-                scaleFactor = 300 / 72; // Scale up for 300dpi
-              } else if (resolution === '150dpi') {
-                scaleFactor = 150 / 72; // Scale up for 150dpi
-              }
-              
-              // Scale canvas according to DPI
-              const scaledWidth = Math.round(baseWidth * scaleFactor);
-              const scaledHeight = Math.round(baseHeight * scaleFactor);
-              
-              console.log(`Creating ${resolution} image at ${scaledWidth}x${scaledHeight} pixels`);
-              
-              canvas.width = scaledWidth;
-              canvas.height = scaledHeight;
-              
-              // Clear canvas and draw image
-              ctx.clearRect(0, 0, canvas.width, canvas.height);
-              ctx.drawImage(originalLogo, 0, 0, canvas.width, canvas.height);
-              
-              // Apply color variations
-              if (color === 'Black') {
-                applyBlackFilter(ctx, canvas.width, canvas.height);
-              } else if (color === 'White') {
-                applyWhiteFilter(ctx, canvas.width, canvas.height);
-              } else if (color === 'Grayscale' && colors.includes('Grayscale')) {
-                applyGrayscaleFilter(ctx, canvas.width, canvas.height);
-              } else if (color === 'Inverted' && colors.includes('Inverted')) {
-                applyInvertedFilter(ctx, canvas.width, canvas.height);
-              }
-              
-              // Convert to blob
-              const mimeType = format === 'PNG' ? 'image/png' : 'image/jpeg';
-              const quality = format === 'JPG' ? 0.9 : undefined;
-              
-              const blob = await new Promise<Blob>((resolve, reject) => {
-                canvas.toBlob(
-                  (blob) => {
-                    if (blob) {
-                      resolve(blob);
-                    } else {
-                      reject(new Error(`Failed to create ${format} blob`));
-                    }
-                  }, 
-                  mimeType, 
-                  quality
-                );
-              });
-              
-              console.log(`Created ${format} blob of size ${blob.size} bytes for ${resolution}`);
-              
-              const formatFolder = `${format}`;
-              files.push({
-                folder: formatFolder,
-                filename: `${brandName}_${color}_${resolution}.${format.toLowerCase()}`,
-                data: blob
-              });
-            } catch (error) {
-              console.error(`Error processing ${format} in ${resolution}:`, error);
-            }
-          }
+          const rasterFiles = await processRasterFormats(
+            ctx, canvas, originalLogo, format, color, resolutions, brandName, colors
+          );
+          files.push(...rasterFiles);
         } 
         // Handle SVG files
         else if (format === 'SVG' && (logoFile.type === 'image/svg+xml' || logoFile.name.toLowerCase().endsWith('.svg'))) {
-          console.log('Processing SVG file');
-          try {
-            // Get SVG content or use previously extracted content
-            let modifiedSvg = svgText || await logoFile.text();
-            
-            // Apply color modifications if needed
-            if (color === 'Black') {
-              modifiedSvg = modifySvgColor(modifiedSvg, '#000000');
-            } else if (color === 'White') {
-              modifiedSvg = modifySvgColor(modifiedSvg, '#FFFFFF');
-            } else if (color === 'Grayscale' && colors.includes('Grayscale')) {
-              modifiedSvg = modifySvgColor(modifiedSvg, '#808080');
-            } else if (color === 'Inverted' && colors.includes('Inverted')) {
-              modifiedSvg = invertSvgColors(modifiedSvg);
-            }
-            
-            const svgBlob = new Blob([modifiedSvg], { type: 'image/svg+xml' });
-            
-            const formatFolder = 'SVG';
-            files.push({
-              folder: formatFolder,
-              filename: `${brandName}_${color}.svg`,
-              data: svgBlob
-            });
-            
-            console.log(`Created SVG file for ${color} variation, size: ${svgBlob.size} bytes`);
-          } catch (error) {
-            console.error('Error processing SVG:', error);
-          }
+          const svgFiles = await processSvgFormat(svgText, color, brandName, colors);
+          files.push(...svgFiles);
         }
-        // Handle PDF files - proper implementation
+        // Handle PDF files
         else if (format === 'PDF') {
-          try {
-            console.log('Generating PDF for', color);
-            
-            // For SVG input, we can use pdf-lib's SVG embedding
-            if (logoFile.type === 'image/svg+xml' || logoFile.name.toLowerCase().endsWith('.svg')) {
-              // Get SVG content or use previously extracted content
-              let modifiedSvg = svgText || await logoFile.text();
-              
-              // Apply color modifications if needed
-              if (color === 'Black') {
-                modifiedSvg = modifySvgColor(modifiedSvg, '#000000');
-              } else if (color === 'White') {
-                modifiedSvg = modifySvgColor(modifiedSvg, '#FFFFFF');
-              } else if (color === 'Grayscale' && colors.includes('Grayscale')) {
-                modifiedSvg = modifySvgColor(modifiedSvg, '#808080');
-              } else if (color === 'Inverted' && colors.includes('Inverted')) {
-                modifiedSvg = invertSvgColors(modifiedSvg);
-              }
-              
-              // Create PDF with embedded SVG
-              const pdfBlob = await createPdfFromSvg(modifiedSvg);
-              
-              const formatFolder = 'PDF';
-              files.push({
-                folder: formatFolder,
-                filename: `${brandName}_${color}.pdf`,
-                data: pdfBlob
-              });
-              
-              console.log(`Created PDF from SVG for ${color}, size: ${pdfBlob.size} bytes`);
-              
-              // Also create EPS from the PDF if EPS is selected
-              if (formats.includes('EPS')) {
-                try {
-                  // Create EPS directly from SVG
-                  const epsBlob = createEpsFromSvg(modifiedSvg);
-                  
-                  const epsFolder = 'EPS';
-                  files.push({
-                    folder: epsFolder,
-                    filename: `${brandName}_${color}.eps`,
-                    data: epsBlob
-                  });
-                  
-                  console.log(`Created EPS from SVG for ${color}, size: ${epsBlob.size} bytes`);
-                } catch (error) {
-                  console.error('Error creating EPS from SVG:', error);
-                }
-              }
-            } 
-            // For raster input, we draw on a canvas and create a PDF
-            else {
-              // Create a canvas with the logo
-              canvas.width = baseWidth;
-              canvas.height = baseHeight;
-              
-              // Clear canvas and draw image
-              ctx.clearRect(0, 0, canvas.width, canvas.height);
-              ctx.drawImage(originalLogo, 0, 0, canvas.width, canvas.height);
-              
-              // Apply color variations
-              if (color === 'Black') {
-                applyBlackFilter(ctx, canvas.width, canvas.height);
-              } else if (color === 'White') {
-                applyWhiteFilter(ctx, canvas.width, canvas.height);
-              } else if (color === 'Grayscale' && colors.includes('Grayscale')) {
-                applyGrayscaleFilter(ctx, canvas.width, canvas.height);
-              } else if (color === 'Inverted' && colors.includes('Inverted')) {
-                applyInvertedFilter(ctx, canvas.width, canvas.height);
-              }
-              
-              // Convert canvas to PNG for embedding in PDF
-              const pngDataUrl = canvas.toDataURL('image/png');
-              
-              // Create PDF with embedded PNG
-              const pdfBlob = await createPdfFromImage(pngDataUrl);
-              
-              const formatFolder = 'PDF';
-              files.push({
-                folder: formatFolder,
-                filename: `${brandName}_${color}.pdf`,
-                data: pdfBlob
-              });
-              
-              console.log(`Created PDF from raster for ${color}, size: ${pdfBlob.size} bytes`);
-              
-              // Also create EPS if requested
-              if (formats.includes('EPS')) {
-                try {
-                  // For raster images, convert to SVG path (simplified)
-                  const simpleSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${baseWidth} ${baseHeight}">
-                    <rect width="${baseWidth}" height="${baseHeight}" fill="${color === 'Black' ? '#000000' : color === 'White' ? '#FFFFFF' : '#808080'}" />
-                  </svg>`;
-                  
-                  const epsBlob = createEpsFromSvg(simpleSvg);
-                  
-                  const epsFolder = 'EPS';
-                  files.push({
-                    folder: epsFolder,
-                    filename: `${brandName}_${color}.eps`,
-                    data: epsBlob
-                  });
-                  
-                  console.log(`Created EPS from raster for ${color}, size: ${epsBlob.size} bytes`);
-                } catch (error) {
-                  console.error('Error creating EPS from raster:', error);
-                }
-              }
-            }
-          } catch (error) {
-            console.error('Error creating PDF:', error);
+          const includeEps = formats.includes('EPS');
+          
+          // For SVG input, we can use pdf-lib's SVG embedding
+          if (logoFile.type === 'image/svg+xml' || logoFile.name.toLowerCase().endsWith('.svg')) {
+            const pdfFiles = await processPdfFromSvg(svgText, color, brandName, colors, includeEps);
+            files.push(...pdfFiles);
+          } 
+          // For raster input, we draw on a canvas and create a PDF
+          else {
+            const pdfFiles = await processPdfFromRaster(
+              ctx, canvas, originalLogo, color, brandName, colors, includeEps
+            );
+            files.push(...pdfFiles);
           }
         }
         // Handle EPS files - if not already created via PDF
         else if (format === 'EPS' && !formats.includes('PDF')) {
-          try {
-            console.log('Generating EPS directly for', color);
-            
-            // For SVG input
-            if (logoFile.type === 'image/svg+xml' || logoFile.name.toLowerCase().endsWith('.svg')) {
-              // Get SVG content or use previously extracted content
-              let modifiedSvg = svgText || await logoFile.text();
-              
-              // Apply color modifications if needed
-              if (color === 'Black') {
-                modifiedSvg = modifySvgColor(modifiedSvg, '#000000');
-              } else if (color === 'White') {
-                modifiedSvg = modifySvgColor(modifiedSvg, '#FFFFFF');
-              } else if (color === 'Grayscale' && colors.includes('Grayscale')) {
-                modifiedSvg = modifySvgColor(modifiedSvg, '#808080');
-              } else if (color === 'Inverted' && colors.includes('Inverted')) {
-                modifiedSvg = invertSvgColors(modifiedSvg);
-              }
-              
-              // Create EPS directly from SVG
-              const epsBlob = createEpsFromSvg(modifiedSvg);
-              
-              const epsFolder = 'EPS';
-              files.push({
-                folder: epsFolder,
-                filename: `${brandName}_${color}.eps`,
-                data: epsBlob
-              });
-              
-              console.log(`Created EPS directly for ${color}, size: ${epsBlob.size} bytes`);
-            } 
-            // For raster input
-            else {
-              // Create a canvas with the logo
-              canvas.width = baseWidth;
-              canvas.height = baseHeight;
-              
-              // Clear canvas and draw image
-              ctx.clearRect(0, 0, canvas.width, canvas.height);
-              ctx.drawImage(originalLogo, 0, 0, canvas.width, canvas.height);
-              
-              // Apply color variations
-              if (color === 'Black') {
-                applyBlackFilter(ctx, canvas.width, canvas.height);
-              } else if (color === 'White') {
-                applyWhiteFilter(ctx, canvas.width, canvas.height);
-              } else if (color === 'Grayscale' && colors.includes('Grayscale')) {
-                applyGrayscaleFilter(ctx, canvas.width, canvas.height);
-              } else if (color === 'Inverted' && colors.includes('Inverted')) {
-                applyInvertedFilter(ctx, canvas.width, canvas.height);
-              }
-              
-              // For raster images, convert to simple SVG rect
-              const simpleSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${baseWidth} ${baseHeight}">
-                <rect width="${baseWidth}" height="${baseHeight}" fill="${color === 'Black' ? '#000000' : color === 'White' ? '#FFFFFF' : '#808080'}" />
-              </svg>`;
-              
-              const epsBlob = createEpsFromSvg(simpleSvg);
-              
-              const epsFolder = 'EPS';
-              files.push({
-                folder: epsFolder,
-                filename: `${brandName}_${color}.eps`,
-                data: epsBlob
-              });
-              
-              console.log(`Created EPS directly for ${color}, size: ${epsBlob.size} bytes`);
-            }
-          } catch (error) {
-            console.error('Error creating EPS:', error);
-          }
+          // For SVG input
+          if (logoFile.type === 'image/svg+xml' || logoFile.name.toLowerCase().endsWith('.svg')) {
+            const epsFiles = processEpsFromSvg(svgText, color, brandName, colors);
+            files.push(...epsFiles);
+          } 
+          // For raster input - already handled in other cases
         }
         // Handle ICO files (favicon)
         else if (format === 'ICO') {
-          try {
-            console.log('Generating ICO for', color);
-            
-            // Set canvas to standard favicon sizes (32x32 for simplicity)
-            canvas.width = 32;
-            canvas.height = 32;
-            
-            // Clear canvas and draw image
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(originalLogo, 0, 0, canvas.width, canvas.height);
-            
-            // Apply color variations
-            if (color === 'Black') {
-              applyBlackFilter(ctx, canvas.width, canvas.height);
-            } else if (color === 'White') {
-              applyWhiteFilter(ctx, canvas.width, canvas.height);
-            } else if (color === 'Grayscale' && colors.includes('Grayscale')) {
-              applyGrayscaleFilter(ctx, canvas.width, canvas.height);
-            } else if (color === 'Inverted' && colors.includes('Inverted')) {
-              applyInvertedFilter(ctx, canvas.width, canvas.height);
-            }
-            
-            // Convert to PNG for ICO (browser can't generate ICO directly)
-            const pngBlob = await new Promise<Blob>((resolve, reject) => {
-              canvas.toBlob(
-                (blob) => {
-                  if (blob) {
-                    resolve(blob);
-                  } else {
-                    reject(new Error(`Failed to create ICO blob`));
-                  }
-                }, 
-                'image/png'
-              );
-            });
-            
-            console.log(`Created ICO (as PNG) of size ${pngBlob.size} bytes`);
-            
-            const formatFolder = 'ICO';
-            files.push({
-              folder: formatFolder,
-              filename: `${brandName}_favicon_${color}.ico`,
-              data: pngBlob
-            });
-          } catch (error) {
-            console.error('Error creating ICO:', error);
-          }
+          const icoFiles = await processIcoFormat(ctx, canvas, originalLogo, color, brandName, colors);
+          files.push(...icoFiles);
         }
       }
     }

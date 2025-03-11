@@ -5,3 +5,7 @@ export * from './zipUtils';
 export * from './colorUtils';
 export * from './vectorUtils';
 export * from './pdfUtils';
+export * from './rasterUtils';
+export * from './svgUtils';
+export * from './pdfProcessor';
+
