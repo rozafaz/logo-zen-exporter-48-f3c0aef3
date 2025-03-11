@@ -1,6 +1,15 @@
 
 // Export all EPS-related functionality
 export * from './epsCore';
-export * from './epsSvgHelpers';
-export * from './epsFormatters';
-export * from './epsPathConverters';
+export { getSvgDimensions } from './epsSvgHelpers';
+export { 
+  createEpsHeader,
+  createEpsFooter,
+  createPlaceholderShape,
+  createFallbackEps,
+  setPostScriptColor
+} from './epsFormatters';
+export {
+  convertPathToPostScript,
+  convertElementsToPostScript
+} from './epsPathConverters';

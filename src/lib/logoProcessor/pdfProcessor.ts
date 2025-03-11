@@ -1,5 +1,5 @@
 
-import { createPdfFromSvg, createPdfFromImage } from './pdfUtils';
+import { createPdfFromSvg, createPdfFromImage } from './pdf';
 import { applyColorToSvg, createSimpleSvgFromRaster, getSvgDimensions } from './svgUtils';
 import { applyColorFilter } from './rasterUtils';
 import type { ProcessedFile } from './types';

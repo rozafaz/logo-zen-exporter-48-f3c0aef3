@@ -1,5 +1,8 @@
 
 import type { ProcessedFile } from '../types';
+import { getSvgDimensions } from './epsSvgHelpers';
+import { createEpsHeader, createEpsFooter, setPostScriptColor, createPlaceholderShape, createFallbackEps } from './epsFormatters';
+import { convertPathToPostScript, convertElementsToPostScript } from './epsPathConverters';
 
 /**
  * Creates an EPS file from SVG content
@@ -61,11 +64,6 @@ export const convertSvgToEps = (svgContent: string, color: string): string => {
     if (!svgElement) {
       throw new Error('No SVG element found in the document');
     }
-    
-    // Import needed modules
-    import { getSvgDimensions } from './epsSvgHelpers';
-    import { createEpsHeader, createEpsFooter, setPostScriptColor, createPlaceholderShape, createFallbackEps } from './epsFormatters';
-    import { convertPathToPostScript, convertElementsToPostScript } from './epsPathConverters';
     
     // Get SVG dimensions
     const dimensions = getSvgDimensions(svgElement);
