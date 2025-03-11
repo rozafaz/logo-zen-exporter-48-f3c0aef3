@@ -47,6 +47,8 @@ const ExportButton: React.FC<ExportButtonProps> = ({
     
     try {
       console.log('Starting export process with settings:', settings);
+      console.log('Logo file type:', logoFile.type, 'name:', logoFile.name, 'size:', logoFile.size);
+      
       await exportLogoPackage(logoFile, settings);
       
       setIsComplete(true);

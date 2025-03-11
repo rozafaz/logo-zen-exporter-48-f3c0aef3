@@ -1,91 +1,14 @@
+
 import { hexToRgb } from './colorUtils';
-import { createPostScriptHeader, createPostScriptFooter, createTestShape, svgPathToPostScript } from './postscriptUtils';
+import { createPostScriptHeader, createPostScriptFooter, createTestShape, svgPathToPostScript, directSvgToEps } from './postscriptUtils';
 
 // Helper function to convert SVG to EPS with improved vector quality
 export const createEpsFromSvg = (svgString: string): Blob => {
   try {
     console.log('Creating EPS from SVG string, length:', svgString.length);
     
-    // Parse SVG
-    const parser = new DOMParser();
-    const svgDoc = parser.parseFromString(svgString, "image/svg+xml");
-    const svgElement = svgDoc.querySelector('svg');
-    
-    if (!svgElement) {
-      throw new Error('Invalid SVG: No SVG element found');
-    }
-    
-    // Get SVG dimensions
-    let width = 1000;
-    let height = 1000;
-    
-    const vb = svgElement.getAttribute('viewBox');
-    if (vb) {
-      const [, , w, h] = vb.split(/\s+/).map(parseFloat);
-      if (!isNaN(w) && !isNaN(h)) {
-        width = w;
-        height = h;
-      }
-    } else {
-      const svgWidth = svgElement.getAttribute('width');
-      const svgHeight = svgElement.getAttribute('height');
-      if (svgWidth && svgHeight) {
-        width = parseFloat(svgWidth);
-        height = parseFloat(svgHeight);
-      }
-    }
-    
-    console.log('SVG dimensions for EPS:', width, 'x', height);
-    
-    // Create EPS content
-    let epsContent = createPostScriptHeader(width, height);
-    
-    // Process paths
-    const paths = svgDoc.querySelectorAll('path');
-    console.log(`Found ${paths.length} paths in SVG`);
-    
-    if (paths.length > 0) {
-      paths.forEach((path, index) => {
-        const d = path.getAttribute('d');
-        const fill = path.getAttribute('fill') || '#000000';
-        const stroke = path.getAttribute('stroke');
-        
-        if (d) {
-          console.log(`Processing path ${index + 1}`);
-          
-          // Set fill color
-          if (fill !== 'none') {
-            const rgb = hexToRgb(fill);
-            if (rgb) {
-              epsContent += `${rgb.r / 255} ${rgb.g / 255} ${rgb.b / 255} rgb\n`;
-            }
-          }
-          
-          // Convert path to PostScript
-          epsContent += svgPathToPostScript(d);
-          
-          // Apply fill or stroke
-          if (fill !== 'none') {
-            epsContent += 'f\n';
-          }
-          if (stroke && stroke !== 'none') {
-            epsContent += 's\n';
-          }
-        }
-      });
-    } else {
-      // Process other SVG elements if no paths found
-      console.log('No paths found, processing other elements');
-      epsContent += processOtherSvgElements(svgDoc);
-    }
-    
-    // If no content was generated, add a test shape
-    if (!epsContent.includes('newpath')) {
-      console.log('No vector content found, adding test shape');
-      epsContent += createTestShape(width, height);
-    }
-    
-    epsContent += createPostScriptFooter();
+    // Use the direct SVG to EPS conversion
+    const epsContent = directSvgToEps(svgString);
     
     // Create EPS blob
     const epsBlob = new Blob([epsContent], { 
@@ -93,7 +16,6 @@ export const createEpsFromSvg = (svgString: string): Blob => {
     });
     
     console.log('EPS file created, size:', epsBlob.size, 'bytes');
-    console.log('EPS content preview:', epsContent.substring(0, 500) + '...');
     
     return epsBlob;
   } catch (error) {
@@ -102,94 +24,7 @@ export const createEpsFromSvg = (svgString: string): Blob => {
   }
 };
 
-// Create a fallback EPS file with a basic shape
-function createFallbackEps(): Blob {
-  const width = 400;
-  const height = 400;
-  const content = `%!PS-Adobe-3.0 EPSF-3.0
-%%BoundingBox: 0 0 ${width} ${height}
-%%Creator: Logo Package Generator
-%%Title: Fallback Logo
-%%Pages: 1
-%%EndComments
-
-/m { moveto } def
-/l { lineto } def
-/cp { closepath } def
-/f { fill } def
-
-% Simple diamond shape
-${width/2} ${height*0.2} m
-${width*0.8} ${height/2} l
-${width/2} ${height*0.8} l
-${width*0.2} ${height/2} l
-cp
-0 0 0 setrgbcolor
-fill
-
-showpage
-%%EOF`;
-
-  return new Blob([content], { type: 'application/postscript' });
-}
-
-// Convert SVG to EPS with improved path handling
-export function convertSVGToEPS(svgString: string): string {
-  let epsData = "";
-  const parser = new DOMParser();
-  const svgDoc = parser.parseFromString(svgString, "image/svg+xml");
-
-  // Check for parsing errors
-  const parseError = svgDoc.querySelector("parsererror");
-  if (parseError) {
-    console.error("SVG parse error:", parseError.textContent);
-    return "";
-  }
-
-  // Process each path element
-  const paths = svgDoc.querySelectorAll("path");
-  console.log(`Found ${paths.length} paths in SVG`);
-  
-  if (paths.length === 0) {
-    // No paths found, process other SVG elements
-    console.log("No paths found, processing other SVG elements");
-    return processOtherSvgElements(svgDoc);
-  }
-  
-  paths.forEach((path, index) => {
-    const d = path.getAttribute("d");
-    if (d) {
-      const fillColor = path.getAttribute("fill") || "#000000";
-      
-      // Convert colors to PostScript RGB values
-      const rgbFill = hexToRgb(fillColor);
-      
-      epsData += `% Path ${index + 1}\n`;
-      
-      // Set fill color
-      if (rgbFill && fillColor !== "none") {
-        epsData += `${rgbFill.r / 255} ${rgbFill.g / 255} ${rgbFill.b / 255} rgb\n`;
-      }
-      
-      // Begin the path
-      epsData += `n\n`;
-      
-      // Convert SVG path to PostScript
-      epsData += convertSVGPathToPostScript(d);
-      
-      // Fill the path
-      if (fillColor && fillColor !== "none") {
-        epsData += `f\n`;
-      } else {
-        epsData += `s\n`;
-      }
-    }
-  });
-  
-  return epsData;
-}
-
-// Process rectangles, circles, and other SVG elements
+// Process other SVG elements
 export function processOtherSvgElements(svgDoc: Document): string {
   let result = "";
   

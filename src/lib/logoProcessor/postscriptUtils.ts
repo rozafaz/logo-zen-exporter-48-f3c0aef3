@@ -246,3 +246,203 @@ export const convertSVGPathToPostScript = (pathData: string): string => {
     return 'n\n100 100 m\n200 100 l\n200 200 l\n100 200 l\ncp\n';
   }
 };
+
+// Direct SVG to EPS conversion function
+export const directSvgToEps = (svgString: string): string => {
+  try {
+    console.log('Starting direct SVG to EPS conversion');
+    
+    // Parse SVG
+    const parser = new DOMParser();
+    const svgDoc = parser.parseFromString(svgString, "image/svg+xml");
+    const svgElement = svgDoc.querySelector('svg');
+    
+    if (!svgElement) {
+      throw new Error('Invalid SVG: No SVG element found');
+    }
+    
+    // Get SVG dimensions
+    let width = 1000;
+    let height = 1000;
+    
+    const vb = svgElement.getAttribute('viewBox');
+    if (vb) {
+      const [, , w, h] = vb.split(/\s+/).map(parseFloat);
+      if (!isNaN(w) && !isNaN(h)) {
+        width = w;
+        height = h;
+      }
+    } else {
+      const svgWidth = svgElement.getAttribute('width');
+      const svgHeight = svgElement.getAttribute('height');
+      if (svgWidth && svgHeight) {
+        width = parseFloat(svgWidth);
+        height = parseFloat(svgHeight);
+      }
+    }
+    
+    console.log('SVG dimensions for EPS:', width, 'x', height);
+    
+    // Start building EPS content
+    let epsContent = createPostScriptHeader(width, height);
+    
+    // Process paths
+    const paths = svgDoc.querySelectorAll('path');
+    console.log(`Found ${paths.length} paths in SVG`);
+    
+    if (paths.length > 0) {
+      paths.forEach((path, index) => {
+        const d = path.getAttribute('d');
+        const fill = path.getAttribute('fill') || '#000000';
+        
+        if (d) {
+          console.log(`Processing path ${index + 1} with fill ${fill}`);
+          
+          // Set fill color
+          if (fill !== 'none') {
+            const rgbValues = hexToRgbForPostScript(fill);
+            epsContent += `${rgbValues} rgb\n`;
+          }
+          
+          // Convert path to PostScript
+          epsContent += svgPathToPostScript(d);
+          
+          // Apply fill
+          if (fill !== 'none') {
+            epsContent += 'f\n';
+          } else {
+            epsContent += 's\n';
+          }
+        }
+      });
+    } else {
+      // Process other SVG elements
+      console.log('No paths found, looking for other SVG elements');
+      
+      // Check for rectangles
+      const rects = svgDoc.querySelectorAll('rect');
+      console.log(`Found ${rects.length} rectangles`);
+      
+      rects.forEach((rect, index) => {
+        const x = parseFloat(rect.getAttribute('x') || '0');
+        const y = parseFloat(rect.getAttribute('y') || '0');
+        const rectWidth = parseFloat(rect.getAttribute('width') || '0');
+        const rectHeight = parseFloat(rect.getAttribute('height') || '0');
+        const fill = rect.getAttribute('fill') || '#000000';
+        
+        console.log(`Processing rect ${index + 1} at (${x},${y}) size ${rectWidth}x${rectHeight}`);
+        
+        // Set fill color
+        if (fill !== 'none') {
+          const rgbValues = hexToRgbForPostScript(fill);
+          epsContent += `${rgbValues} rgb\n`;
+        }
+        
+        // Create rectangle path
+        epsContent += `n\n${x} ${y} m\n`;
+        epsContent += `${x + rectWidth} ${y} l\n`;
+        epsContent += `${x + rectWidth} ${y + rectHeight} l\n`;
+        epsContent += `${x} ${y + rectHeight} l\n`;
+        epsContent += `cp\n`;
+        
+        // Apply fill
+        if (fill !== 'none') {
+          epsContent += 'f\n';
+        } else {
+          epsContent += 's\n';
+        }
+      });
+      
+      // Check for circles
+      const circles = svgDoc.querySelectorAll('circle');
+      console.log(`Found ${circles.length} circles`);
+      
+      circles.forEach((circle, index) => {
+        const cx = parseFloat(circle.getAttribute('cx') || '0');
+        const cy = parseFloat(circle.getAttribute('cy') || '0');
+        const r = parseFloat(circle.getAttribute('r') || '0');
+        const fill = circle.getAttribute('fill') || '#000000';
+        
+        console.log(`Processing circle ${index + 1} at (${cx},${cy}) radius ${r}`);
+        
+        // Set fill color
+        if (fill !== 'none') {
+          const rgbValues = hexToRgbForPostScript(fill);
+          epsContent += `${rgbValues} rgb\n`;
+        }
+        
+        // Create circle path (approximating with cubic bezier curves)
+        const kappa = 0.5522848; // Magic number for approximating a circle with bezier curves
+        const ox = r * kappa;    // Control point offset horizontal
+        const oy = r * kappa;    // Control point offset vertical
+        
+        epsContent += `n\n${cx + r} ${cy} m\n`; // Start at right point
+        // Top right quadrant
+        epsContent += `${cx + r} ${cy + oy} ${cx + ox} ${cy + r} ${cx} ${cy + r} c\n`;
+        // Top left quadrant
+        epsContent += `${cx - ox} ${cy + r} ${cx - r} ${cy + oy} ${cx - r} ${cy} c\n`;
+        // Bottom left quadrant
+        epsContent += `${cx - r} ${cy - oy} ${cx - ox} ${cy - r} ${cx} ${cy - r} c\n`;
+        // Bottom right quadrant
+        epsContent += `${cx + ox} ${cy - r} ${cx + r} ${cy - oy} ${cx + r} ${cy} c\n`;
+        epsContent += `cp\n`;
+        
+        // Apply fill
+        if (fill !== 'none') {
+          epsContent += 'f\n';
+        } else {
+          epsContent += 's\n';
+        }
+      });
+    }
+    
+    // Add a test shape if we didn't generate any content
+    if (!epsContent.includes('cp')) {
+      console.log('No vector content found, adding test shape');
+      epsContent += createTestShape(width, height);
+    }
+    
+    // Add footer
+    epsContent += createPostScriptFooter();
+    
+    console.log('EPS content generated, length:', epsContent.length);
+    return epsContent;
+  } catch (error) {
+    console.error('Error in direct SVG to EPS conversion:', error);
+    // Return a fallback EPS with a simple shape
+    return createFallbackEps();
+  }
+};
+
+// Convert hex color to RGB PostScript values
+const hexToRgbForPostScript = (hex: string): string => {
+  // Default to black
+  if (!hex || hex === 'none') return '0 0 0';
+  
+  // Expand shorthand form (e.g. "03F") to full form (e.g. "0033FF")
+  const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+  const fullHex = hex.replace(shorthandRegex, (m, r, g, b) => r + r + g + g + b + b);
+  
+  // Parse hex values
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(fullHex);
+  if (!result) return '0 0 0'; // Default to black if parsing fails
+  
+  // Convert to normalized RGB values
+  const r = parseInt(result[1], 16) / 255;
+  const g = parseInt(result[2], 16) / 255;
+  const b = parseInt(result[3], 16) / 255;
+  
+  return `${r.toFixed(3)} ${g.toFixed(3)} ${b.toFixed(3)}`;
+};
+
+// Create a fallback EPS with a simple shape
+const createFallbackEps = (): string => {
+  const width = 400;
+  const height = 400;
+  
+  let content = createPostScriptHeader(width, height);
+  content += createTestShape(width, height);
+  content += createPostScriptFooter();
+  
+  return content;
+};

@@ -1,3 +1,4 @@
+
 import { modifySvgColor, invertSvgColors } from './colorUtils';
 import { createEpsFromSvg } from './vectorUtils';
 import type { ProcessedFile } from './types';
