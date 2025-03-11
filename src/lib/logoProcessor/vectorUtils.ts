@@ -1,13 +1,12 @@
-
 import { hexToRgb } from './colorUtils';
-import { createPostScriptHeader, createPostScriptFooter, createTestShape } from './postscriptUtils';
+import { createPostScriptHeader, createPostScriptFooter, createTestShape, svgPathToPostScript } from './postscriptUtils';
 
 // Helper function to convert SVG to EPS with improved vector quality
 export const createEpsFromSvg = (svgString: string): Blob => {
   try {
     console.log('Creating EPS from SVG string, length:', svgString.length);
     
-    // Extract SVG dimensions and viewBox for proper bounding box
+    // Parse SVG
     const parser = new DOMParser();
     const svgDoc = parser.parseFromString(svgString, "image/svg+xml");
     const svgElement = svgDoc.querySelector('svg');
@@ -20,7 +19,6 @@ export const createEpsFromSvg = (svgString: string): Blob => {
     let width = 1000;
     let height = 1000;
     
-    // Try to get dimensions from viewBox first
     const vb = svgElement.getAttribute('viewBox');
     if (vb) {
       const [, , w, h] = vb.split(/\s+/).map(parseFloat);
@@ -29,7 +27,6 @@ export const createEpsFromSvg = (svgString: string): Blob => {
         height = h;
       }
     } else {
-      // Try width/height attributes
       const svgWidth = svgElement.getAttribute('width');
       const svgHeight = svgElement.getAttribute('height');
       if (svgWidth && svgHeight) {
@@ -43,33 +40,65 @@ export const createEpsFromSvg = (svgString: string): Blob => {
     // Create EPS content
     let epsContent = createPostScriptHeader(width, height);
     
-    // Convert SVG paths and shapes to EPS commands
-    let epsBody = convertSVGToEPS(svgString);
+    // Process paths
+    const paths = svgDoc.querySelectorAll('path');
+    console.log(`Found ${paths.length} paths in SVG`);
     
-    // If no paths were found, add a test shape
-    if (!epsBody || epsBody.trim() === '') {
-      console.warn('No paths found in SVG, adding test shape');
-      epsBody = createTestShape(width, height);
+    if (paths.length > 0) {
+      paths.forEach((path, index) => {
+        const d = path.getAttribute('d');
+        const fill = path.getAttribute('fill') || '#000000';
+        const stroke = path.getAttribute('stroke');
+        
+        if (d) {
+          console.log(`Processing path ${index + 1}`);
+          
+          // Set fill color
+          if (fill !== 'none') {
+            const rgb = hexToRgb(fill);
+            if (rgb) {
+              epsContent += `${rgb.r / 255} ${rgb.g / 255} ${rgb.b / 255} rgb\n`;
+            }
+          }
+          
+          // Convert path to PostScript
+          epsContent += svgPathToPostScript(d);
+          
+          // Apply fill or stroke
+          if (fill !== 'none') {
+            epsContent += 'f\n';
+          }
+          if (stroke && stroke !== 'none') {
+            epsContent += 's\n';
+          }
+        }
+      });
+    } else {
+      // Process other SVG elements if no paths found
+      console.log('No paths found, processing other elements');
+      epsContent += processOtherSvgElements(svgDoc);
     }
     
-    epsContent += epsBody;
+    // If no content was generated, add a test shape
+    if (!epsContent.includes('newpath')) {
+      console.log('No vector content found, adding test shape');
+      epsContent += createTestShape(width, height);
+    }
+    
     epsContent += createPostScriptFooter();
     
-    // Log EPS content for debugging
-    console.log('EPS content length:', epsContent.length);
-    console.log('EPS preview:', epsContent.substring(0, 500) + '...');
-    
-    // Create EPS blob with PostScript MIME type
+    // Create EPS blob
     const epsBlob = new Blob([epsContent], { 
       type: 'application/postscript'
     });
     
     console.log('EPS file created, size:', epsBlob.size, 'bytes');
+    console.log('EPS content preview:', epsContent.substring(0, 500) + '...');
+    
     return epsBlob;
   } catch (error) {
     console.error('Error creating EPS:', error);
-    // Return a fallback EPS with a basic shape
-    return createFallbackEps();
+    throw error;
   }
 };
 
