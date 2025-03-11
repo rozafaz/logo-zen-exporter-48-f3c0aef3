@@ -1,3 +1,4 @@
+import { hexToRgb } from './colorUtils';
 
 // Helper function to convert SVG to EPS with improved vector quality
 export const createEpsFromSvg = (svgString: string): Blob => {
@@ -9,86 +10,107 @@ export const createEpsFromSvg = (svgString: string): Blob => {
     const svgDoc = parser.parseFromString(svgString, "image/svg+xml");
     const svgElement = svgDoc.querySelector('svg');
     
+    if (!svgElement) {
+      throw new Error('Invalid SVG: No SVG element found');
+    }
+    
+    // Get SVG dimensions
     let width = 1000;
     let height = 1000;
+    let viewBox = '0 0 1000 1000';
     
-    if (svgElement) {
-      // Try to get dimensions from viewBox or width/height attributes
-      const viewBox = svgElement.getAttribute('viewBox');
-      if (viewBox) {
-        const [, , w, h] = viewBox.split(' ').map(parseFloat);
-        if (!isNaN(w) && !isNaN(h)) {
-          width = w;
-          height = h;
-        }
-      } else {
-        const svgWidth = svgElement.getAttribute('width');
-        const svgHeight = svgElement.getAttribute('height');
-        if (svgWidth && svgHeight) {
-          width = parseFloat(svgWidth);
-          height = parseFloat(svgHeight);
-        }
+    // Try to get dimensions from viewBox first
+    const vb = svgElement.getAttribute('viewBox');
+    if (vb) {
+      viewBox = vb;
+      const [, , w, h] = vb.split(' ').map(parseFloat);
+      if (!isNaN(w) && !isNaN(h)) {
+        width = w;
+        height = h;
+      }
+    } else {
+      // Try width/height attributes
+      const svgWidth = svgElement.getAttribute('width');
+      const svgHeight = svgElement.getAttribute('height');
+      if (svgWidth && svgHeight) {
+        width = parseFloat(svgWidth);
+        height = parseFloat(svgHeight);
+        viewBox = `0 0 ${width} ${height}`;
       }
     }
     
+    // Enhanced EPS header with better DSC comments and setup
     const epsHeader = `%!PS-Adobe-3.0 EPSF-3.0
 %%BoundingBox: 0 0 ${Math.ceil(width)} ${Math.ceil(height)}
-%%HiResBoundingBox: 0 0 ${width} ${height}
+%%HiResBoundingBox: 0 0 ${width.toFixed(6)} ${height.toFixed(6)}
 %%Creator: AI Logo Package Exporter
 %%Title: Vector Logo
 %%CreationDate: ${new Date().toISOString()}
 %%DocumentData: Clean7Bit
-%%LanguageLevel: 2
+%%LanguageLevel: 3
 %%Pages: 1
 %%EndComments
 
 %%BeginProlog
 /bd { bind def } bind def
-/incompound false def
-/m { moveto } bd
-/l { lineto } bd
-/c { curveto } bd
-/F { incompound not {fill} if } bd
-/f { closepath F } bd
-/S { stroke } bd
-/clipproc {
-  clip
-} def
-/W { clipproc } bd
+/ld { load def } bd
+/GR /grestore ld
+/GS /gsave ld
+/RM /rmoveto ld
+/TR /translate ld
+/CT /curveto ld
+/L /lineto ld
+/M /moveto ld
+/CP /closepath ld
+/S /stroke ld
+/F /fill ld
+/RC { rectclip } bd
+/RF { rectfill } bd
+/RG { setrgbcolor } bd
+/W { clip } bd
 %%EndProlog
 
 %%BeginSetup
+<< /PageSize [${width} ${height}] >> setpagedevice
+1 setlinewidth
 %%EndSetup
 
 %%Page: 1 1
 %%BeginPageSetup
+GS
+0 0 TR
+1 1 scale
 %%EndPageSetup
 
-% Save graphics state
-gsave
-
-% Scale and translate coordinates to match SVG viewBox
-0.75 0.75 scale
-0 ${height} translate
-0 -1 scale
+% Initialize graphics state
+0 0 0 RG % Set default color to black
+1 setlinewidth
+0 setlinecap
+0 setlinejoin
 
 `;
 
+    // Convert SVG paths and shapes to EPS commands
+    const epsBody = convertSVGToEPS(svgString);
+    
     const epsFooter = `
+
 % Restore graphics state
-grestore
+GR
 
 showpage
 %%Trailer
 %%EOF`;
 
-    // Convert SVG to EPS commands
-    const epsBody = convertSVGToEPS(svgString);
-    
     const epsContent = epsHeader + epsBody + epsFooter;
     
-    console.log('EPS file created successfully');
-    return new Blob([epsContent], { type: 'application/postscript' });
+    // Create EPS blob with PostScript MIME type
+    const epsBlob = new Blob([epsContent], { 
+      type: 'application/postscript'
+    });
+    
+    console.log('EPS file created successfully, size:', epsBlob.size, 'bytes');
+    return epsBlob;
   } catch (error) {
     console.error('Error creating EPS:', error);
     throw error;
