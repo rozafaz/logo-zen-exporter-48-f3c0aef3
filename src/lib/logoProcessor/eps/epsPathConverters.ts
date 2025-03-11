@@ -1,3 +1,4 @@
+
 import { setPostScriptColor, convertSvgTransform } from './epsSvgHelpers';
 
 /**
@@ -437,7 +438,7 @@ export const convertElementsToPostScript = (
       // Move to center, scale, draw circle, restore scale
       output += `${cx.toFixed(3)} ${psY.toFixed(3)} translate\n`;
       output += `${rx.toFixed(3)} ${ry.toFixed(3)} scale\n`;
-      output += '0 0 1 0 360 arc\n`;
+      output += '0 0 1 0 360 arc\n';  // Fixed: changed the mismatched quotes
       output += `${(1/rx).toFixed(6)} ${(1/ry).toFixed(6)} scale\n`;
       output += `${(-cx).toFixed(3)} ${(-psY).toFixed(3)} translate\n`;
       output += 'closepath\n';
