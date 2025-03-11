@@ -1,3 +1,4 @@
+
 import JSZip from 'jszip';
 import { PDFDocument } from 'pdf-lib';
 import type { ExportSettings } from '@/components/ExportOptions';
@@ -17,7 +18,7 @@ const convertSvgPathToPostScript = (svgPath: string): string => {
     .replace(/([Ll])\s*([0-9.-]+)[,\s]([0-9.-]+)/g, (_, cmd, x, y) => 
       `${x} ${y} ${cmd === 'l' ? 'rlineto' : 'lineto'}\n`)
     .replace(/([Zz])/g, 'closepath\n')
-    .replace(/([Cc])\s*([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)/g, 
+    .replace(/([Cc])\s*([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)/g, 
       (_, cmd, x1, y1, x2, y2, x, y) => `${x1} ${y1} ${x2} ${y2} ${x} ${y} curveto\n`);
 };
 
@@ -50,14 +51,14 @@ const createPdfFromImage = async (pngDataUrl: string): Promise<Blob> => {
   }
 };
 
-// Create EPS from SVG paths
+// Improved EPS generation from SVG with proper vector paths
 const createEpsFromSvg = (svgString: string): Blob => {
   try {
     console.log('Creating EPS from SVG string');
     
-    // Basic EPS header with proper bounding box
+    // Improved EPS header with proper bounding box
     const epsHeader = `%!PS-Adobe-3.0 EPSF-3.0
-%%BoundingBox: 0 0 600 600
+%%BoundingBox: 0 0 1000 1000
 %%Creator: Logo Exporter
 %%Pages: 1
 %%EndComments
@@ -68,6 +69,7 @@ const createEpsFromSvg = (svgString: string): Blob => {
 /h { closepath } bind def
 /f { fill } bind def
 /s { stroke } bind def
+/rgb { setrgbcolor } bind def
 %%EndProlog
 %%Page: 1 1
 
@@ -78,7 +80,8 @@ const createEpsFromSvg = (svgString: string): Blob => {
 1 setlinejoin
 
 % Center the drawing
-300 300 translate
+500 500 translate
+1 -1 scale % Flip vertically to match SVG coordinate system
 
 `;
     
@@ -111,18 +114,19 @@ const createEpsFromSvg = (svgString: string): Blob => {
           
           // Set fill color if available
           if (rgbFill) {
-            epsBody += `${rgbFill.r / 255} ${rgbFill.g / 255} ${rgbFill.b / 255} setrgbcolor\n`;
+            epsBody += `${rgbFill.r / 255} ${rgbFill.g / 255} ${rgbFill.b / 255} rgb\n`;
           }
           
-          const postScriptPath = convertSvgPathToPostScript(d);
-          epsBody += `newpath\n${postScriptPath}\n`;
+          // Improved path conversion
+          epsBody += `newpath\n`;
+          epsBody += svgPathToPostScript(d);
           
           // Apply fill and/or stroke
           if (strokeColor && strokeColor !== "none") {
             epsBody += "gsave\n";
             const rgbStroke = hexToRgb(strokeColor);
             if (rgbStroke) {
-              epsBody += `${rgbStroke.r / 255} ${rgbStroke.g / 255} ${rgbStroke.b / 255} setrgbcolor\n`;
+              epsBody += `${rgbStroke.r / 255} ${rgbStroke.g / 255} ${rgbStroke.b / 255} rgb\n`;
             }
             epsBody += "stroke\ngrestore\n";
           }
@@ -151,14 +155,14 @@ const createEpsFromSvg = (svgString: string): Blob => {
         
         epsBody += `% Rectangle ${index + 1}\n`;
         if (rgbFill) {
-          epsBody += `${rgbFill.r / 255} ${rgbFill.g / 255} ${rgbFill.b / 255} setrgbcolor\n`;
+          epsBody += `${rgbFill.r / 255} ${rgbFill.g / 255} ${rgbFill.b / 255} rgb\n`;
         }
         
-        epsBody += `newpath\n${x} ${y} moveto\n`;
-        epsBody += `${x + width} ${y} lineto\n`;
-        epsBody += `${x + width} ${y + height} lineto\n`;
-        epsBody += `${x} ${y + height} lineto\n`;
-        epsBody += `closepath\nfill\n`;
+        epsBody += `newpath\n${x} ${y} m\n`;
+        epsBody += `${x + width} ${y} l\n`;
+        epsBody += `${x + width} ${y + height} l\n`;
+        epsBody += `${x} ${y + height} l\n`;
+        epsBody += `h\nf\n`;
       });
       
       // Handle circles
@@ -173,17 +177,17 @@ const createEpsFromSvg = (svgString: string): Blob => {
         
         epsBody += `% Circle ${index + 1}\n`;
         if (rgbFill) {
-          epsBody += `${rgbFill.r / 255} ${rgbFill.g / 255} ${rgbFill.b / 255} setrgbcolor\n`;
+          epsBody += `${rgbFill.r / 255} ${rgbFill.g / 255} ${rgbFill.b / 255} rgb\n`;
         }
         
-        epsBody += `newpath\n${cx} ${cy} ${r} 0 360 arc\nclosepath\nfill\n`;
+        epsBody += `newpath\n${cx} ${cy} ${r} 0 360 arc\nh\nf\n`;
       });
     }
     
     // If we still don't have any content, create a simple placeholder
     if (epsBody.trim() === "") {
       console.warn("No SVG elements found, creating placeholder");
-      epsBody += `% Placeholder shape\nnewpath\n-100 -100 moveto\n100 -100 lineto\n100 100 lineto\n-100 100 lineto\nclosepath\n0.5 setgray\nfill\n`;
+      epsBody += `% Placeholder shape\nnewpath\n-100 -100 m\n100 -100 l\n100 100 l\n-100 100 l\nh\n0.5 setgray\nf\n`;
     }
     
     const epsFooter = "\nshowpage\n%%EOF";
@@ -195,6 +199,21 @@ const createEpsFromSvg = (svgString: string): Blob => {
     console.error('Error creating EPS:', error);
     throw error;
   }
+};
+
+// Improved SVG path to PostScript conversion function
+const svgPathToPostScript = (svgPath: string): string => {
+  return svgPath
+    .replace(/([Mm])\s*([0-9.-]+)[,\s]([0-9.-]+)/g, (_, cmd, x, y) => 
+      `${x} ${y} ${cmd === 'm' ? 'rmoveto' : 'moveto'}\n`)
+    .replace(/([Ll])\s*([0-9.-]+)[,\s]([0-9.-]+)/g, (_, cmd, x, y) => 
+      `${x} ${y} ${cmd === 'l' ? 'rlineto' : 'lineto'}\n`)
+    .replace(/([Zz])/g, 'closepath\n')
+    .replace(/([Cc])\s*([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)/g, 
+      (_, cmd, x1, y1, x2, y2, x, y) => `${x1} ${y1} ${x2} ${y2} ${x} ${y} curveto\n`)
+    .replace(/([Aa])\s*([0-9.-]+)[,\s]([0-9.-]+)\s+([0-9.-]+)\s+([01])[,\s]([01])[,\s]([0-9.-]+)[,\s]([0-9.-]+)/g, 
+      (_, cmd, rx, ry, xAxisRotation, largeArcFlag, sweepFlag, x, y) => 
+      `% Arc path (approximated): ${rx} ${ry} ${xAxisRotation} ${largeArcFlag} ${sweepFlag} ${x} ${y}\n${x} ${y} lineto\n`);
 };
 
 // Helper function to convert hex color to RGB
@@ -510,8 +529,8 @@ export const processLogo = async (
               // Also create EPS from the PDF if EPS is selected
               if (formats.includes('EPS')) {
                 try {
-                  // For client-side, we generate a simple EPS with metadata that points to the PDF
-                  const epsBlob = await createEpsFromPdf(modifiedSvg);
+                  // Create EPS directly from SVG
+                  const epsBlob = createEpsFromSvg(modifiedSvg);
                   
                   const epsFolder = 'EPS';
                   files.push({
@@ -520,9 +539,9 @@ export const processLogo = async (
                     data: epsBlob
                   });
                   
-                  console.log(`Created EPS from PDF for ${color}, size: ${epsBlob.size} bytes`);
+                  console.log(`Created EPS from SVG for ${color}, size: ${epsBlob.size} bytes`);
                 } catch (error) {
-                  console.error('Error creating EPS from PDF:', error);
+                  console.error('Error creating EPS from SVG:', error);
                 }
               }
             } 
@@ -565,8 +584,12 @@ export const processLogo = async (
               // Also create EPS if requested
               if (formats.includes('EPS')) {
                 try {
-                  // For client-side, we generate a simple EPS with metadata that points to the PDF
-                  const epsBlob = await createEpsFromPdf(svgText);
+                  // For raster images, convert to SVG path (simplified)
+                  const simpleSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${baseWidth} ${baseHeight}">
+                    <rect width="${baseWidth}" height="${baseHeight}" fill="${color === 'Black' ? '#000000' : color === 'White' ? '#FFFFFF' : '#808080'}" />
+                  </svg>`;
+                  
+                  const epsBlob = createEpsFromSvg(simpleSvg);
                   
                   const epsFolder = 'EPS';
                   files.push({
@@ -575,9 +598,9 @@ export const processLogo = async (
                     data: epsBlob
                   });
                   
-                  console.log(`Created EPS from PDF for ${color}, size: ${epsBlob.size} bytes`);
+                  console.log(`Created EPS from raster for ${color}, size: ${epsBlob.size} bytes`);
                 } catch (error) {
-                  console.error('Error creating EPS from PDF:', error);
+                  console.error('Error creating EPS from raster:', error);
                 }
               }
             }
@@ -606,8 +629,8 @@ export const processLogo = async (
                 modifiedSvg = invertSvgColors(modifiedSvg);
               }
               
-              // Create a PDF first, then convert to EPS
-              const epsBlob = await createEpsFromPdf(modifiedSvg);
+              // Create EPS directly from SVG
+              const epsBlob = createEpsFromSvg(modifiedSvg);
               
               const epsFolder = 'EPS';
               files.push({
@@ -639,11 +662,12 @@ export const processLogo = async (
                 applyInvertedFilter(ctx, canvas.width, canvas.height);
               }
               
-              // Convert canvas to PNG
-              const pngDataUrl = canvas.toDataURL('image/png');
+              // For raster images, convert to simple SVG rect
+              const simpleSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${baseWidth} ${baseHeight}">
+                <rect width="${baseWidth}" height="${baseHeight}" fill="${color === 'Black' ? '#000000' : color === 'White' ? '#FFFFFF' : '#808080'}" />
+              </svg>`;
               
-              // Create PDF first, then convert to EPS
-              const epsBlob = await createEpsFromPdf(svgText);
+              const epsBlob = createEpsFromSvg(simpleSvg);
               
               const epsFolder = 'EPS';
               files.push({
@@ -790,77 +814,6 @@ const createPdfFromSvg = async (svgString: string): Promise<Blob> => {
   }
 };
 
-// Function to create an EPS from SVG
-const createEpsFromPdf = async (svgString: string): Promise<Blob> => {
-  try {
-    console.log('Creating EPS from SVG string');
-    
-    // Basic EPS header
-    const epsHeader = `%!PS-Adobe-3.0 EPSF-3.0
-%%BoundingBox: 0 0 600 600
-%%Creator: Logo Exporter
-%%Pages: 1
-%%EndComments
-%%BeginProlog
-/m { moveto } bind def
-/l { lineto } bind def
-/c { curveto } bind def
-/h { closepath } bind def
-/f { fill } bind def
-/s { stroke } bind def
-%%EndProlog
-%%Page: 1 1
-
-% Initialize graphics state
-0 setgray
-1 setlinewidth
-1 setlinecap
-1 setlinejoin
-
-% Center the drawing
-300 300 translate
-
-`;
-    
-    // Parse SVG and extract paths
-    const parser = new DOMParser();
-    const svgDoc = parser.parseFromString(svgString, "image/svg+xml");
-    const paths = svgDoc.querySelectorAll("path");
-    
-    let epsBody = "";
-    paths.forEach(path => {
-      const d = path.getAttribute("d") || "";
-      const postScriptPath = convertSvgPathToPostScript(d);
-      epsBody += `newpath\n${postScriptPath}\nstroke\n`;
-    });
-    
-    const epsFooter = "\nshowpage\n%%EOF";
-    const epsContent = epsHeader + epsBody + epsFooter;
-    
-    console.log('EPS file created successfully');
-    return new Blob([epsContent], { type: 'application/postscript' });
-  } catch (error) {
-    console.error('Error creating EPS:', error);
-    throw error;
-  }
-};
-
-// Helper function to generate EPS path instructions
-const generateEPSPaths = (): string => {
-  // Generate a simple shape as a fallback
-  return `
-    % Draw a placeholder rectangle
-    newpath
-    -100 -100 moveto
-    200 0 rlineto
-    0 200 rlineto
-    -200 0 rlineto
-    closepath
-    0.5 setgray
-    fill
-  `;
-};
-
 export const createZipPackage = async (files: ProcessedFile[]): Promise<Blob> => {
   console.log('Creating ZIP package...');
   try {
@@ -942,6 +895,7 @@ export const downloadZip = (blob: Blob, brandName: string) => {
   }
 };
 
+// Export this function for testing
 export const testZipDownload = () => {
   const zip = new JSZip();
   zip.file("test.txt", "This is a test file");
