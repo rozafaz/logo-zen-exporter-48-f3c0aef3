@@ -104,24 +104,5 @@ fill
   return content;
 };
 
-import { hexToRgb } from '../colorUtils';
-
-/**
- * Set PostScript color based on fill color
- */
-export const setPostScriptColor = (fillColor: string): string => {
-  if (!fillColor || fillColor === 'none') {
-    return '0 0 0 setrgbcolor\n'; // Default to black
-  }
-  
-  const rgb = hexToRgb(fillColor);
-  if (!rgb) {
-    return '0 0 0 setrgbcolor\n'; // Default to black if invalid color
-  }
-  
-  const r = rgb.r / 255;
-  const g = rgb.g / 255;
-  const b = rgb.b / 255;
-  
-  return `${r.toFixed(3)} ${g.toFixed(3)} ${b.toFixed(3)} setrgbcolor\n`;
-};
+// Export the setPostScriptColor function from epsSvgHelpers.ts instead of duplicating it here
+export { setPostScriptColor } from './epsSvgHelpers';
