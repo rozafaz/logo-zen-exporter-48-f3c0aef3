@@ -26,6 +26,23 @@ const ExportButton: React.FC<ExportButtonProps> = ({
       return;
     }
     
+    // Validate export settings
+    if (settings.formats.length === 0) {
+      toast.error('Please select at least one export format');
+      return;
+    }
+    
+    if (settings.colors.length === 0) {
+      toast.error('Please select at least one color variation');
+      return;
+    }
+    
+    if ((settings.formats.includes('PNG') || settings.formats.includes('JPG')) && 
+        settings.resolutions.length === 0) {
+      toast.error('Please select at least one resolution for raster formats');
+      return;
+    }
+    
     setIsExporting(true);
     
     try {

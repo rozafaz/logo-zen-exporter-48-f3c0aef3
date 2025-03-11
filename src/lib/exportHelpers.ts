@@ -9,6 +9,21 @@ export const exportLogoPackage = async (logoFile: File, settings: ExportSettings
   console.log('Starting export process:', logoFile.name, logoFile.type);
   
   try {
+    // Validate formats
+    if (settings.formats.length === 0) {
+      throw new Error('Please select at least one export format');
+    }
+    
+    // Validate resolutions for raster formats
+    if ((settings.formats.includes('PNG') || settings.formats.includes('JPG')) && settings.resolutions.length === 0) {
+      throw new Error('Please select at least one resolution for raster formats');
+    }
+    
+    // Validate colors
+    if (settings.colors.length === 0) {
+      throw new Error('Please select at least one color variation');
+    }
+    
     // Process the logo into multiple formats
     const processedFiles = await processLogo(logoFile, settings);
     console.log(`Generated ${processedFiles.length} processed files`);
@@ -30,10 +45,7 @@ export const exportLogoPackage = async (logoFile: File, settings: ExportSettings
   }
 };
 
-/**
- * Converts a color logo to black
- * In a real implementation, this would do image processing
- */
+// These functions are now implemented in logoProcessor.ts
 export const convertToBlack = (imageData: ImageData): ImageData => {
   // This is a placeholder - now implemented in logoProcessor.ts
   return imageData;
