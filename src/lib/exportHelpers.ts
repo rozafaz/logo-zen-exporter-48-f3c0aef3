@@ -1,18 +1,29 @@
+
 import type { ExportSettings } from '@/components/ExportOptions';
 import { processLogo, createZipPackage, downloadZip } from './logoProcessor';
 
 /**
- * In a real implementation, this function would handle the actual export process
- * Currently it's a simulation for demonstration purposes
+ * Handles the export process for logo files
  */
 export const exportLogoPackage = async (logoFile: File, settings: ExportSettings): Promise<void> => {
+  console.log('Starting export process:', logoFile.name, logoFile.type);
+  
   try {
     // Process the logo into multiple formats
     const processedFiles = await processLogo(logoFile, settings);
+    console.log(`Generated ${processedFiles.length} processed files`);
+    
+    if (processedFiles.length === 0) {
+      throw new Error('No files were generated during processing. Please check file format and try again.');
+    }
     
     // Create and download ZIP package
     const zipBlob = await createZipPackage(processedFiles);
+    console.log(`ZIP package created, size: ${zipBlob.size} bytes`);
+    
+    // Trigger the download
     downloadZip(zipBlob, settings.brandName);
+    console.log('Download initiated');
   } catch (error) {
     console.error('Export error:', error);
     throw error;
@@ -24,32 +35,22 @@ export const exportLogoPackage = async (logoFile: File, settings: ExportSettings
  * In a real implementation, this would do image processing
  */
 export const convertToBlack = (imageData: ImageData): ImageData => {
-  // This is a placeholder - in a real app this would convert the image to black
+  // This is a placeholder - now implemented in logoProcessor.ts
   return imageData;
 };
 
-/**
- * Converts a color logo to white
- * In a real implementation, this would do image processing
- */
 export const convertToWhite = (imageData: ImageData): ImageData => {
-  // This is a placeholder - in a real app this would convert the image to white
+  // This is a placeholder - now implemented in logoProcessor.ts
   return imageData;
 };
 
-/**
- * Creates a ZIP file from the generated files
- * In a real implementation, this would use JSZip or similar
- */
 export const createZipFile = async (files: { name: string; data: Blob }[]): Promise<Blob> => {
-  // This is a placeholder - in a real app this would create a ZIP file
+  // This is a placeholder - now implemented in logoProcessor.ts
   return new Blob(['Placeholder ZIP data'], { type: 'application/zip' });
 };
 
-/**
- * Triggers the file download
- */
 export const downloadFile = (blob: Blob, filename: string): void => {
+  // This is a placeholder - now implemented in logoProcessor.ts
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
