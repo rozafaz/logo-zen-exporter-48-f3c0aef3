@@ -45,24 +45,24 @@ export const exportLogoPackage = async (logoFile: File, settings: ExportSettings
   }
 };
 
-// These functions are now implemented in logoProcessor.ts
+// These functions are now implemented in logoProcessor module
 export const convertToBlack = (imageData: ImageData): ImageData => {
-  // This is a placeholder - now implemented in logoProcessor.ts
+  // This is a placeholder - now implemented in logoProcessor/colorUtils.ts
   return imageData;
 };
 
 export const convertToWhite = (imageData: ImageData): ImageData => {
-  // This is a placeholder - now implemented in logoProcessor.ts
+  // This is a placeholder - now implemented in logoProcessor/colorUtils.ts
   return imageData;
 };
 
 export const createZipFile = async (files: { name: string; data: Blob }[]): Promise<Blob> => {
-  // This is a placeholder - now implemented in logoProcessor.ts
+  // This is a placeholder - now implemented in logoProcessor/zipUtils.ts
   return new Blob(['Placeholder ZIP data'], { type: 'application/zip' });
 };
 
 export const downloadFile = (blob: Blob, filename: string): void => {
-  // This is a placeholder - now implemented in logoProcessor.ts
+  // This is a placeholder - now implemented in logoProcessor/zipUtils.ts
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
