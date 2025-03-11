@@ -1,3 +1,4 @@
+
 import { setPostScriptColor, convertSvgTransform } from '../epsSvgHelpers';
 
 export const convertRectElement = (

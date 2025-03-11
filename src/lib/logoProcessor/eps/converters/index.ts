@@ -6,6 +6,13 @@ export * from './ellipseConverter';
 export * from './lineConverter';
 export * from './polygonConverter';
 
+import { convertPathElement } from './pathConverter';
+import { convertRectElement } from './rectConverter';
+import { convertCircleElement } from './circleConverter';
+import { convertEllipseElement } from './ellipseConverter';
+import { convertLineElement } from './lineConverter';
+import { convertPolygonElement } from './polygonConverter';
+
 export const convertElements = (
   elements: Element[],
   baseFillColor: string,
