@@ -1,4 +1,3 @@
-
 import { setPostScriptColor, convertSvgTransform } from './epsSvgHelpers';
 
 /**
@@ -256,7 +255,6 @@ export const convertElementsToPostScript = (
       
       const pathFill = element.getAttribute('fill') || baseFillColor;
       const pathStroke = element.getAttribute('stroke');
-      const strokeWidth = element.getAttribute('stroke-width');
       const opacity = element.getAttribute('opacity') || '1';
       
       // Start a new graphics state to isolate changes
@@ -339,25 +337,25 @@ export const convertElementsToPostScript = (
         output += `${(x + width - rx).toFixed(3)} ${psY.toFixed(3)} lineto\n`;
         
         // Bottom-right corner arc
-        output += `${x + width} ${psY} ${rx} 270 360 arc\n`;
+        output += `${(x + width).toFixed(3)} ${psY.toFixed(3)} ${rx.toFixed(3)} 270 360 arc\n`;
         
         // Right side
         output += `${(x + width).toFixed(3)} ${(psY + height - ry).toFixed(3)} lineto\n`;
         
         // Top-right corner arc
-        output += `${x + width - rx} ${psY + height} ${rx} 0 90 arc\n`;
+        output += `${(x + width - rx).toFixed(3)} ${(psY + height).toFixed(3)} ${rx.toFixed(3)} 0 90 arc\n`;
         
         // Top side
         output += `${(x + rx).toFixed(3)} ${(psY + height).toFixed(3)} lineto\n`;
         
         // Top-left corner arc
-        output += `${x} ${psY + height - ry} ${rx} 90 180 arc\n`;
+        output += `${x.toFixed(3)} ${(psY + height - ry).toFixed(3)} ${rx.toFixed(3)} 90 180 arc\n`;
         
         // Left side
         output += `${x.toFixed(3)} ${(psY + ry).toFixed(3)} lineto\n`;
         
         // Bottom-left corner arc
-        output += `${x + rx} ${psY} ${rx} 180 270 arc\n`;
+        output += `${(x + rx).toFixed(3)} ${psY.toFixed(3)} ${rx.toFixed(3)} 180 270 arc\n`;
         
         output += 'closepath\n';
       } else {
@@ -464,7 +462,7 @@ export const convertElementsToPostScript = (
       // Move to center, scale, draw circle, restore scale
       output += `${cx.toFixed(3)} ${psY.toFixed(3)} translate\n`;
       output += `${rx.toFixed(3)} ${ry.toFixed(3)} scale\n`;
-      output += `0 0 1 0 360 arc\n`; // Fixed: string quote consistency
+      output += `0 0 1 0 360 arc\n`; 
       output += `${(1/rx).toFixed(6)} ${(1/ry).toFixed(6)} scale\n`;
       output += `${(-cx).toFixed(3)} ${(-psY).toFixed(3)} translate\n`;
       output += 'closepath\n';
