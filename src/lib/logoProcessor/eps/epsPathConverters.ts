@@ -286,6 +286,7 @@ export const convertElementsToPostScript = (
         if (strokeWidth) {
           const parsedWidth = parseFloat(strokeWidth);
           if (!isNaN(parsedWidth)) {
+            // Fix: Ensure numeric value is converted to string with toFixed
             output += `${parsedWidth.toFixed(3)} setlinewidth\n`;
           }
         }
@@ -379,6 +380,7 @@ export const convertElementsToPostScript = (
         if (strokeWidth) {
           const parsedWidth = parseFloat(strokeWidth);
           if (!isNaN(parsedWidth)) {
+            // Fix: Ensure numeric value is converted to string with toFixed
             output += `${parsedWidth.toFixed(3)} setlinewidth\n`;
           }
         }
@@ -424,6 +426,7 @@ export const convertElementsToPostScript = (
         if (strokeWidth) {
           const parsedWidth = parseFloat(strokeWidth);
           if (!isNaN(parsedWidth)) {
+            // Fix: Ensure numeric value is converted to string with toFixed
             output += `${parsedWidth.toFixed(3)} setlinewidth\n`;
           }
         }
@@ -476,6 +479,7 @@ export const convertElementsToPostScript = (
         if (strokeWidth) {
           const parsedWidth = parseFloat(strokeWidth);
           if (!isNaN(parsedWidth)) {
+            // Fix: Ensure numeric value is converted to string with toFixed
             output += `${parsedWidth.toFixed(3)} setlinewidth\n`;
           }
         }
@@ -512,6 +516,7 @@ export const convertElementsToPostScript = (
       if (strokeWidth) {
         const parsedWidth = parseFloat(strokeWidth);
         if (!isNaN(parsedWidth)) {
+          // Fix: Ensure numeric value is converted to string with toFixed
           output += `${parsedWidth.toFixed(3)} setlinewidth\n`;
         }
       }
