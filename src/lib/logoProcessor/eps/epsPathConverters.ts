@@ -121,7 +121,7 @@ export const convertPathToPostScript = (pathData: string): string => {
             currentX = token === 'S' ? x : currentX + x;
             currentY = token === 'S' ? y : currentY + y;
             
-            output += `${cx1} ${cy1} ${cx2} ${cy2} ${currentX} ${currentY} curveto\n`;
+            output += `${cx1.toString()} ${cy1.toString()} ${cx2.toString()} ${cy2.toString()} ${currentX.toString()} ${currentY.toString()} curveto\n`;
           }
         }
         break;
@@ -151,7 +151,7 @@ export const convertPathToPostScript = (pathData: string): string => {
             currentX = qx;
             currentY = qy;
             
-            output += `${cx1} ${cy1} ${cx2} ${cy2} ${currentX} ${currentY} curveto\n`;
+            output += `${cx1.toString()} ${cy1.toString()} ${cx2.toString()} ${cy2.toString()} ${currentX.toString()} ${currentY.toString()} curveto\n`;
           }
         }
         break;
@@ -255,22 +255,22 @@ export const convertElementsToPostScript = (
       if (rx > 0 && ry > 0) {
         // Rounded rectangle implementation (approximate with arcs)
         output += 'newpath\n';
-        output += `${x + rx} ${psY} moveto\n`;
-        output += `${x + width - rx} ${psY} lineto\n`;
-        output += `${x + width - rx} ${psY} ${rx} 0 90 arc\n`;
-        output += `${x + width} ${psY + height - ry} lineto\n`;
-        output += `${x + width} ${psY + height - ry} ${ry} 270 0 arc\n`;
-        output += `${x + rx} ${psY + height} lineto\n`;
-        output += `${x + rx} ${psY + height} ${ry} 180 270 arc\n`;
-        output += `${x} ${psY + ry} lineto\n`;
-        output += `${x} ${psY + ry} ${rx} 90 180 arc\n`;
+        output += `${(x + rx).toString()} ${psY.toString()} moveto\n`;
+        output += `${(x + width - rx).toString()} ${psY.toString()} lineto\n`;
+        output += `${(x + width - rx).toString()} ${psY.toString()} ${rx.toString()} 0 90 arc\n`;
+        output += `${(x + width).toString()} ${(psY + height - ry).toString()} lineto\n`;
+        output += `${(x + width).toString()} ${(psY + height - ry).toString()} ${ry.toString()} 270 0 arc\n`;
+        output += `${(x + rx).toString()} ${(psY + height).toString()} lineto\n`;
+        output += `${(x + rx).toString()} ${(psY + height).toString()} ${ry.toString()} 180 270 arc\n`;
+        output += `${x.toString()} ${(psY + ry).toString()} lineto\n`;
+        output += `${x.toString()} ${(psY + ry).toString()} ${rx.toString()} 90 180 arc\n`;
       } else {
         // Simple rectangle
         output += 'newpath\n';
-        output += `${x} ${psY} moveto\n`;
-        output += `${width} 0 rlineto\n`;
-        output += `0 ${height} rlineto\n`;
-        output += `${-width} 0 rlineto\n`;
+        output += `${x.toString()} ${psY.toString()} moveto\n`;
+        output += `${width.toString()} 0 rlineto\n`;
+        output += `0 ${height.toString()} rlineto\n`;
+        output += `${(-width).toString()} 0 rlineto\n`;
         output += 'closepath\n';
       }
       
@@ -303,4 +303,3 @@ export const convertElementsToPostScript = (
   
   return output;
 };
-
