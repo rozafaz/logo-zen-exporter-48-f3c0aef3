@@ -1,4 +1,3 @@
-
 import { setPostScriptColor, convertSvgTransform } from './epsSvgHelpers';
 
 /**
