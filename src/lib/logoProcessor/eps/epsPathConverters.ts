@@ -219,7 +219,7 @@ export const convertElementsToPostScript = (
         output += setPostScriptColor(pathStroke);
         // Set stroke width if specified
         if (strokeWidth) {
-          output += `${parseFloat(strokeWidth) || 1} setlinewidth\n`;
+          output += `${parseFloat(strokeWidth).toString() || "1"} setlinewidth\n`;
         }
         // Draw the path again for the stroke (if already filled)
         if (pathFill && pathFill !== 'none') {
@@ -239,7 +239,7 @@ export const convertElementsToPostScript = (
       const width = parseFloat(element.getAttribute('width') || '0');
       const height = parseFloat(element.getAttribute('height') || '0');
       const rx = parseFloat(element.getAttribute('rx') || '0');
-      const ry = parseFloat(element.getAttribute('ry') || rx);
+      const ry = parseFloat(element.getAttribute('ry') || rx.toString());
       const rectFill = element.getAttribute('fill') || baseFillColor;
       
       if (width <= 0 || height <= 0) return;
