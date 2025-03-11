@@ -1,3 +1,4 @@
+
 import { setPostScriptColor, convertSvgTransform } from './epsSvgHelpers';
 
 /**
@@ -255,6 +256,7 @@ export const convertElementsToPostScript = (
       
       const pathFill = element.getAttribute('fill') || baseFillColor;
       const pathStroke = element.getAttribute('stroke');
+      const strokeWidth = element.getAttribute('stroke-width');
       const opacity = element.getAttribute('opacity') || '1';
       
       // Start a new graphics state to isolate changes
@@ -284,7 +286,6 @@ export const convertElementsToPostScript = (
         if (strokeWidth) {
           const parsedWidth = parseFloat(strokeWidth);
           if (!isNaN(parsedWidth)) {
-            // Fix: Ensure numeric value is converted to string with toFixed
             output += `${parsedWidth.toFixed(3)} setlinewidth\n`;
           }
         }
@@ -378,7 +379,6 @@ export const convertElementsToPostScript = (
         if (strokeWidth) {
           const parsedWidth = parseFloat(strokeWidth);
           if (!isNaN(parsedWidth)) {
-            // Fix: Ensure numeric value is converted to string with toFixed
             output += `${parsedWidth.toFixed(3)} setlinewidth\n`;
           }
         }
