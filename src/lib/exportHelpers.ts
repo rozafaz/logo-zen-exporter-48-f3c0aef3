@@ -1,25 +1,22 @@
-
 import type { ExportSettings } from '@/components/ExportOptions';
+import { processLogo, createZipPackage, downloadZip } from './logoProcessor';
 
 /**
  * In a real implementation, this function would handle the actual export process
  * Currently it's a simulation for demonstration purposes
  */
 export const exportLogoPackage = async (logoFile: File, settings: ExportSettings): Promise<void> => {
-  console.log('Exporting logo package with settings:', settings);
-  console.log('Logo file:', logoFile);
-  
-  // Simulate processing delay
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      // This is where actual file processing would occur:
-      // - Canvas rendering for different formats
-      // - Color transformations
-      // - Resolution adjustments
-      // - File creation and packaging
-      resolve();
-    }, 2000);
-  });
+  try {
+    // Process the logo into multiple formats
+    const processedFiles = await processLogo(logoFile, settings);
+    
+    // Create and download ZIP package
+    const zipBlob = await createZipPackage(processedFiles);
+    downloadZip(zipBlob, settings.brandName);
+  } catch (error) {
+    console.error('Export error:', error);
+    throw error;
+  }
 };
 
 /**
