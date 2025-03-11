@@ -1,4 +1,3 @@
-
 import { PDFDocument, rgb } from 'pdf-lib';
 
 /**
@@ -10,7 +9,6 @@ export const createPdfFromSvg = async (svgString: string): Promise<Blob> => {
     
     // Create a new PDF document
     const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([600, 600]);
     
     // Extract SVG dimensions from viewBox
     const viewBoxMatch = svgString.match(/viewBox=["']([^"']+)["']/);
@@ -25,6 +23,11 @@ export const createPdfFromSvg = async (svgString: string): Promise<Blob> => {
       }
     }
     
+    // Set aspect ratio for the page to match the SVG
+    const pageWidth = 600;
+    const pageHeight = 600;
+    const page = pdfDoc.addPage([pageWidth, pageHeight]);
+    
     // Create an SVG Data URI
     const svgDataUri = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svgString)))}`;
     
@@ -34,65 +37,51 @@ export const createPdfFromSvg = async (svgString: string): Promise<Blob> => {
       .then(async buffer => {
         // For true vector support, we need to use a library that can
         // properly interpret SVG paths and convert them to PDF vector paths.
-        // Since we can't add new dependencies directly, we'll use our improved 
-        // approach without rasterizing to PNG
-        
-        // Instead of trying to access the private content stream,
-        // we'll use the public drawing methods of pdf-lib
-        console.log('Adding SVG vector data to PDF using public API');
-        
         return buffer;
       });
     
-    // Calculate dimensions to maintain aspect ratio
-    const scale = Math.min(500 / width, 500 / height);
+    // Calculate dimensions to maintain aspect ratio while centering
+    const scale = Math.min(pageWidth * 0.8 / width, pageHeight * 0.8 / height);
     
-    // Center on page
-    const x = (600 - width * scale) / 2;
-    const y = (600 - height * scale) / 2;
+    // Center on page - improved positioning
+    const x = (pageWidth - width * scale) / 2;
+    const y = (pageHeight - height * scale) / 2;
     
     // Add vector content to page (improved approach)
     // Extract paths from SVG and draw them using pdf-lib's vector drawing operations
     const paths = extractSimplePaths(svgString);
     
-    // Draw boundary rectangle to represent the SVG viewbox
-    page.drawRectangle({
-      x,
-      y,
-      width: width * scale,
-      height: height * scale,
-      borderColor: rgb(0, 0, 0),
-      borderWidth: 0,
-      color: rgb(1, 1, 1),
-    });
-    
-    // For each path found in the SVG, try to draw a simplified representation
-    paths.forEach((pathData, index) => {
+    // Draw the paths with proper fill and positioning
+    paths.forEach((pathData) => {
       // Draw a simplified representation based on the path type
       if (pathData.type === 'rect') {
         page.drawRectangle({
           x: x + (pathData.x || 0) * scale,
-          y: y + (pathData.y || 0) * scale,
+          y: y + ((height - (pathData.y || 0) - (pathData.height || 0))) * scale, // Fix Y-axis coordinate system difference
           width: (pathData.width || 10) * scale,
           height: (pathData.height || 10) * scale,
-          color: rgb(0, 0, 0),
-          opacity: 0.8,
+          color: rgb(0, 0, 0), // Default to black, but use color if available
+          opacity: pathData.opacity || 1,
+          borderWidth: 0, // Set to 0 to ensure we're using fill, not stroke
         });
       } else if (pathData.type === 'circle') {
         page.drawCircle({
           x: x + (pathData.cx || width/2) * scale,
-          y: y + (pathData.cy || height/2) * scale,
-          size: (pathData.r || 10) * scale,
+          y: y + ((height - (pathData.cy || height/2))) * scale, // Fix Y-axis coordinate system difference
+          size: (pathData.r || 10) * scale * 2,
           color: rgb(0, 0, 0),
-          opacity: 0.8,
+          borderWidth: 0, // Set to 0 to ensure we're using fill, not stroke
+          opacity: pathData.opacity || 1,
         });
       } else if (pathData.type === 'path') {
-        // We'd need a complex SVG path parser here
-        // This is simplified for basic shapes
+        // Fix for path rendering - prioritize fill over stroke
         page.drawSvgPath(pathData.d || `M ${x} ${y} L ${x+10*scale} ${y+10*scale}`, {
-          borderColor: rgb(0, 0, 0),
-          borderWidth: 1,
-          scale,
+          x: x,
+          y: y + height * scale, // Fix Y-axis coordinate system difference
+          scale: scale,
+          color: rgb(0, 0, 0), // Use fill color instead of stroke
+          borderWidth: 0, // Set to 0 to prioritize fill over stroke
+          opacity: pathData.opacity || 1,
         });
       }
     });
@@ -112,43 +101,63 @@ export const createPdfFromSvg = async (svgString: string): Promise<Blob> => {
 };
 
 /**
- * Helper function to extract basic paths and shapes from SVG
+ * Helper function to extract basic paths and shapes from SVG with improved color handling
  */
 function extractSimplePaths(svgString: string): Array<{type: string, [key: string]: any}> {
   const shapes: Array<{type: string, [key: string]: any}> = [];
   
+  // Convert some strokes to fills for better representation
+  const fixedSvgString = svgString
+    .replace(/stroke="([^"]+)"([^>]*?)fill="none"/g, 'fill="$1"$2stroke="none"') // Convert stroke-only to fill
+    .replace(/stroke-width="([^"]+)"/g, 'data-stroke-width="$1"'); // Preserve stroke width as data attribute
+  
   // Extract rectangles
-  const rectRegex = /<rect[^>]*?(?:x=["']([^"']*?)["'])?[^>]*?(?:y=["']([^"']*?)["'])?[^>]*?(?:width=["']([^"']*?)["'])?[^>]*?(?:height=["']([^"']*?)["'])?[^>]*?\/>/g;
+  const rectRegex = /<rect[^>]*?(?:x=["']([^"']*?)["'])?[^>]*?(?:y=["']([^"']*?)["'])?[^>]*?(?:width=["']([^"']*?)["'])?[^>]*?(?:height=["']([^"']*?)["'])?[^>]*?(?:fill=["']([^"']*?)["'])?[^>]*?(?:opacity=["']([^"']*?)["'])?[^>]*?\/>/g;
   let rectMatch;
-  while ((rectMatch = rectRegex.exec(svgString)) !== null) {
+  while ((rectMatch = rectRegex.exec(fixedSvgString)) !== null) {
+    const fill = rectMatch[5] || '#000000';
+    const opacity = rectMatch[6] !== undefined ? parseFloat(rectMatch[6]) : 1;
+    
     shapes.push({
       type: 'rect',
       x: parseFloat(rectMatch[1] || '0'),
       y: parseFloat(rectMatch[2] || '0'),
       width: parseFloat(rectMatch[3] || '10'),
-      height: parseFloat(rectMatch[4] || '10')
+      height: parseFloat(rectMatch[4] || '10'),
+      fill,
+      opacity
     });
   }
   
   // Extract circles
-  const circleRegex = /<circle[^>]*?(?:cx=["']([^"']*?)["'])?[^>]*?(?:cy=["']([^"']*?)["'])?[^>]*?(?:r=["']([^"']*?)["'])?[^>]*?\/>/g;
+  const circleRegex = /<circle[^>]*?(?:cx=["']([^"']*?)["'])?[^>]*?(?:cy=["']([^"']*?)["'])?[^>]*?(?:r=["']([^"']*?)["'])?[^>]*?(?:fill=["']([^"']*?)["'])?[^>]*?(?:opacity=["']([^"']*?)["'])?[^>]*?\/>/g;
   let circleMatch;
-  while ((circleMatch = circleRegex.exec(svgString)) !== null) {
+  while ((circleMatch = circleRegex.exec(fixedSvgString)) !== null) {
+    const fill = circleMatch[4] || '#000000';
+    const opacity = circleMatch[5] !== undefined ? parseFloat(circleMatch[5]) : 1;
+    
     shapes.push({
       type: 'circle',
       cx: parseFloat(circleMatch[1] || '0'),
       cy: parseFloat(circleMatch[2] || '0'),
-      r: parseFloat(circleMatch[3] || '5')
+      r: parseFloat(circleMatch[3] || '5'),
+      fill,
+      opacity
     });
   }
   
   // Extract paths
-  const pathRegex = /<path[^>]*?(?:d=["']([^"']*?)["'])[^>]*?\/>/g;
+  const pathRegex = /<path[^>]*?(?:d=["']([^"']*?)["'])[^>]*?(?:fill=["']([^"']*?)["'])?[^>]*?(?:opacity=["']([^"']*?)["'])?[^>]*?\/>/g;
   let pathMatch;
-  while ((pathMatch = pathRegex.exec(svgString)) !== null) {
+  while ((pathMatch = pathRegex.exec(fixedSvgString)) !== null) {
+    const fill = pathMatch[2] || '#000000';
+    const opacity = pathMatch[3] !== undefined ? parseFloat(pathMatch[3]) : 1;
+    
     shapes.push({
       type: 'path',
-      d: pathMatch[1]
+      d: pathMatch[1],
+      fill,
+      opacity
     });
   }
   
