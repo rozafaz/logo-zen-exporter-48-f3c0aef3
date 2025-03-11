@@ -107,6 +107,18 @@ export const convertSvgToEps = (svgContent: string, color: string): string => {
       epsContent += convertElementsToPostScript(circles, fillColor, dimensions.height, 'circle');
     }
     
+    // Convert ellipses to PostScript
+    if (ellipses.length > 0) {
+      console.log('Processing SVG ellipses...');
+      epsContent += `% Warning: ellipse conversion not fully implemented\n`;
+    }
+    
+    // Convert lines to PostScript
+    if (lines.length > 0) {
+      console.log('Processing SVG lines...');
+      epsContent += `% Warning: line conversion not fully implemented\n`;
+    }
+    
     // Add placeholder if no content was processed
     if (paths.length === 0 && rects.length === 0 && circles.length === 0) {
       console.warn('No vector elements found in SVG, adding placeholder');

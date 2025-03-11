@@ -9,6 +9,7 @@ export const createEpsHeader = (width: number, height: number): string => {
 %%Creator: Logo Package Generator
 %%Title: Vector Logo
 %%DocumentData: Clean7Bit
+%%Pages: 1
 %%EndComments
 
 %%BeginProlog
@@ -34,6 +35,7 @@ export const createEpsHeader = (width: number, height: number): string => {
 1 setlinewidth
 0 setlinecap
 0 setlinejoin
+10 setmiterlimit
 %%EndSetup
 
 %%Page: 1 1

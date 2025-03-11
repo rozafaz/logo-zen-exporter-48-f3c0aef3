@@ -1,5 +1,5 @@
 
-import { setPostScriptColor } from './epsFormatters';
+import { setPostScriptColor } from './epsSvgHelpers';
 
 /**
  * Convert SVG path data to PostScript commands
@@ -16,7 +16,9 @@ export const convertPathToPostScript = (pathData: string): string => {
   // Normalize path data to ensure consistent parsing
   const normalizedPath = pathData
     .replace(/([MLHVCSQTAZmlhvcsqtaz])/g, ' $1 ')
-    .replace(/\s+/g, ' ')
+    .replace(/[-]/g, ' -')  // Ensure negative numbers are properly spaced
+    .replace(/[,]/g, ' ')   // Replace commas with spaces
+    .replace(/\s+/g, ' ')   // Normalize whitespace
     .trim();
   
   // Split into tokens
@@ -25,6 +27,7 @@ export const convertPathToPostScript = (pathData: string): string => {
   
   while (i < tokens.length) {
     const token = tokens[i++];
+    if (!token || token === '') continue;
     
     switch (token.toUpperCase()) {
       case 'M': // moveto
@@ -154,6 +157,12 @@ export const convertPathToPostScript = (pathData: string): string => {
         }
         break;
         
+      case 'A': // Arc - convert to cubic bezier approximation
+        console.log('Arc commands in SVG are approximated in EPS');
+        // Skip the 7 parameters of the arc command
+        i += 7;
+        break;
+        
       case 'Z':
       case 'z': // closepath
         output += 'closepath\n';
@@ -163,6 +172,7 @@ export const convertPathToPostScript = (pathData: string): string => {
         
       default:
         // Skip invalid or unsupported commands
+        console.warn('Unsupported SVG path command:', token);
         break;
     }
   }
@@ -190,6 +200,9 @@ export const convertElementsToPostScript = (
       const pathStroke = element.getAttribute('stroke');
       const strokeWidth = element.getAttribute('stroke-width');
       
+      // Start a new graphics state to isolate changes
+      output += 'gsave\n';
+      
       // Set color for this path
       output += setPostScriptColor(pathFill);
       
@@ -199,36 +212,71 @@ export const convertElementsToPostScript = (
       // Apply fill or stroke
       if (pathFill && pathFill !== 'none') {
         output += 'fill\n';
-      } else if (pathStroke && pathStroke !== 'none') {
+      }
+      
+      // Handle stroke if specified
+      if (pathStroke && pathStroke !== 'none') {
+        output += setPostScriptColor(pathStroke);
         // Set stroke width if specified
         if (strokeWidth) {
           output += `${parseFloat(strokeWidth) || 1} setlinewidth\n`;
         }
+        // Draw the path again for the stroke (if already filled)
+        if (pathFill && pathFill !== 'none') {
+          output += convertPathToPostScript(pathData);
+        }
         output += 'stroke\n';
-      } else {
-        // Default to fill if neither is specified
-        output += 'fill\n';
+      } else if (!pathFill || pathFill === 'none') {
+        // Default to stroke if fill is none
+        output += 'stroke\n';
       }
+      
+      // Restore graphics state
+      output += 'grestore\n';
     } else if (elementType === 'rect') {
       const x = parseFloat(element.getAttribute('x') || '0');
       const y = parseFloat(element.getAttribute('y') || '0');
       const width = parseFloat(element.getAttribute('width') || '0');
       const height = parseFloat(element.getAttribute('height') || '0');
+      const rx = parseFloat(element.getAttribute('rx') || '0');
+      const ry = parseFloat(element.getAttribute('ry') || rx);
       const rectFill = element.getAttribute('fill') || baseFillColor;
       
       if (width <= 0 || height <= 0) return;
       
+      output += 'gsave\n';
+      
       // Set color for this rectangle
       output += setPostScriptColor(rectFill);
       
-      // Create rectangle path - adjust Y coordinate for PostScript
-      output += 'newpath\n';
-      output += `${x} ${svgHeight - y - height} moveto\n`;
-      output += `${width} 0 rlineto\n`;
-      output += `0 ${height} rlineto\n`;
-      output += `${-width} 0 rlineto\n`;
-      output += 'closepath\n';
+      // Convert SVG y-coordinate to PostScript y-coordinate
+      const psY = svgHeight - y - height;
+      
+      // Create rectangle path, handling rounded corners if specified
+      if (rx > 0 && ry > 0) {
+        // Rounded rectangle implementation (approximate with arcs)
+        output += 'newpath\n';
+        output += `${x + rx} ${psY} moveto\n`;
+        output += `${x + width - rx} ${psY} lineto\n`;
+        output += `${x + width - rx} ${psY} ${rx} 0 90 arc\n`;
+        output += `${x + width} ${psY + height - ry} lineto\n`;
+        output += `${x + width} ${psY + height - ry} ${ry} 270 0 arc\n`;
+        output += `${x + rx} ${psY + height} lineto\n`;
+        output += `${x + rx} ${psY + height} ${ry} 180 270 arc\n`;
+        output += `${x} ${psY + ry} lineto\n`;
+        output += `${x} ${psY + ry} ${rx} 90 180 arc\n`;
+      } else {
+        // Simple rectangle
+        output += 'newpath\n';
+        output += `${x} ${psY} moveto\n`;
+        output += `${width} 0 rlineto\n`;
+        output += `0 ${height} rlineto\n`;
+        output += `${-width} 0 rlineto\n`;
+        output += 'closepath\n';
+      }
+      
       output += 'fill\n';
+      output += 'grestore\n';
     } else if (elementType === 'circle') {
       const cx = parseFloat(element.getAttribute('cx') || '0');
       const cy = parseFloat(element.getAttribute('cy') || '0');
@@ -236,6 +284,8 @@ export const convertElementsToPostScript = (
       const circleFill = element.getAttribute('fill') || baseFillColor;
       
       if (r <= 0) return;
+      
+      output += 'gsave\n';
       
       // Set color for this circle
       output += setPostScriptColor(circleFill);
@@ -245,7 +295,10 @@ export const convertElementsToPostScript = (
       output += `${cx} ${svgHeight - cy} ${r} 0 360 arc\n`;
       output += 'closepath\n';
       output += 'fill\n';
+      
+      output += 'grestore\n';
     }
+    
     // Additional element types could be added here (ellipses, polylines, etc.)
   });
   

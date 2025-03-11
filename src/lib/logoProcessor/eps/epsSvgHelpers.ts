@@ -39,12 +39,32 @@ export const getSvgDimensions = (svgElement: Element): { width: number; height: 
  * Set PostScript color based on fill color
  */
 export const setPostScriptColor = (fillColor: string): string => {
-  if (!fillColor || fillColor === 'none') {
+  if (!fillColor || fillColor === 'none' || fillColor === 'transparent') {
     return '0 0 0 setrgbcolor\n'; // Default to black
   }
   
+  // Special handling for keywords
+  if (fillColor.toLowerCase() === 'black') return '0 0 0 setrgbcolor\n';
+  if (fillColor.toLowerCase() === 'white') return '1 1 1 setrgbcolor\n';
+  if (fillColor.toLowerCase() === 'red') return '1 0 0 setrgbcolor\n';
+  if (fillColor.toLowerCase() === 'green') return '0 1 0 setrgbcolor\n';
+  if (fillColor.toLowerCase() === 'blue') return '0 0 1 setrgbcolor\n';
+  
+  // Handle RGB color in different formats
+  if (fillColor.startsWith('rgb')) {
+    const rgbMatch = fillColor.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/);
+    if (rgbMatch) {
+      const r = parseInt(rgbMatch[1]) / 255;
+      const g = parseInt(rgbMatch[2]) / 255;
+      const b = parseInt(rgbMatch[3]) / 255;
+      return `${r.toFixed(3)} ${g.toFixed(3)} ${b.toFixed(3)} setrgbcolor\n`;
+    }
+  }
+  
+  // Handle hex colors
   const rgb = hexToRgb(fillColor);
   if (!rgb) {
+    console.warn('Invalid color format:', fillColor, 'defaulting to black');
     return '0 0 0 setrgbcolor\n'; // Default to black if invalid color
   }
   
