@@ -1,4 +1,3 @@
-
 import { modifySvgColor, invertSvgColors } from './colorUtils';
 import { createEpsFromSvg } from './vectorUtils';
 import type { ProcessedFile } from './types';
@@ -110,4 +109,64 @@ export const createSimpleSvgFromRaster = (
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${baseWidth} ${baseHeight}">
     <rect width="${baseWidth}" height="${baseHeight}" fill="${fillColor}" />
   </svg>`;
+};
+
+/**
+ * Extracts path data from SVG for vector PDF creation
+ */
+export const extractSvgPathsForPdf = (svgText: string): string[] => {
+  const paths: string[] = [];
+  
+  // Find all path elements
+  const pathRegex = /<path[^>]*d=["']([^"']+)["'][^>]*>/g;
+  let match;
+  
+  while ((match = pathRegex.exec(svgText)) !== null) {
+    paths.push(match[1]);
+  }
+  
+  // Find all rect elements and convert to paths
+  const rectRegex = /<rect[^>]*x=["']([^"']+)["'][^>]*y=["']([^"']+)["'][^>]*width=["']([^"']+)["'][^>]*height=["']([^"']+)["'][^>]*>/g;
+  
+  while ((match = rectRegex.exec(svgText)) !== null) {
+    const [, x, y, width, height] = match;
+    // Convert rect to path d attribute
+    const pathD = `M ${x} ${y} h ${width} v ${height} h -${width} Z`;
+    paths.push(pathD);
+  }
+  
+  return paths;
+};
+
+/**
+ * Gets SVG dimensions from viewBox or width/height attributes
+ */
+export const getSvgDimensions = (svgText: string): { width: number; height: number } => {
+  // Try to get dimensions from viewBox
+  const viewBoxMatch = svgText.match(/viewBox=["']([^"']+)["']/);
+  if (viewBoxMatch && viewBoxMatch[1]) {
+    const [, , w, h] = viewBoxMatch[1].split(/\s+/).map(Number);
+    if (!isNaN(w) && !isNaN(h)) {
+      return { width: w, height: h };
+    }
+  }
+  
+  // Try to get from width/height attributes
+  const widthMatch = svgText.match(/width=["']([^"']+)["']/);
+  const heightMatch = svgText.match(/height=["']([^"']+)["']/);
+  
+  let width = 600;
+  let height = 600;
+  
+  if (widthMatch && widthMatch[1]) {
+    const w = parseFloat(widthMatch[1]);
+    if (!isNaN(w)) width = w;
+  }
+  
+  if (heightMatch && heightMatch[1]) {
+    const h = parseFloat(heightMatch[1]);
+    if (!isNaN(h)) height = h;
+  }
+  
+  return { width, height };
 };

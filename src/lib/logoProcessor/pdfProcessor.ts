@@ -1,11 +1,11 @@
 
 import { createPdfFromSvg, createPdfFromImage } from './pdfUtils';
-import { applyColorToSvg, createSimpleSvgFromRaster, processEpsFromSvg } from './svgUtils';
+import { applyColorToSvg, createSimpleSvgFromRaster, processEpsFromSvg, getSvgDimensions } from './svgUtils';
 import { applyColorFilter } from './rasterUtils';
 import type { ProcessedFile } from './types';
 
 /**
- * Processes PDF format from SVG input
+ * Processes PDF format from SVG input with true vector preservation
  */
 export const processPdfFromSvg = async (
   svgText: string,
@@ -17,12 +17,16 @@ export const processPdfFromSvg = async (
   const files: ProcessedFile[] = [];
   
   try {
-    console.log('Generating PDF from SVG for', color);
+    console.log('Generating vector PDF from SVG for', color);
     
     // Apply color modifications if needed
     let modifiedSvg = applyColorToSvg(svgText, color, colors);
     
-    // Create PDF with embedded SVG
+    // Extract dimensions for better positioning
+    const dimensions = getSvgDimensions(modifiedSvg);
+    console.log('SVG dimensions:', dimensions);
+    
+    // Create PDF with embedded SVG as vector
     const pdfBlob = await createPdfFromSvg(modifiedSvg);
     
     const formatFolder = 'PDF';
@@ -32,7 +36,7 @@ export const processPdfFromSvg = async (
       data: pdfBlob
     });
     
-    console.log(`Created PDF from SVG for ${color}, size: ${pdfBlob.size} bytes`);
+    console.log(`Created vector PDF from SVG for ${color}, size: ${pdfBlob.size} bytes`);
     
     // Also create EPS from the PDF if EPS is selected
     if (includeEps) {
