@@ -8,6 +8,101 @@ interface ProcessedFile {
   data: Blob;
 }
 
+// Create PDF from image data
+const createPdfFromImage = async (pngDataUrl: string): Promise<Blob> => {
+  try {
+    console.log('Creating PDF from PNG data URL');
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([600, 600]);
+    
+    const pngImage = await fetch(pngDataUrl).then(res => res.arrayBuffer());
+    const image = await pdfDoc.embedPng(pngImage);
+    
+    const { width, height } = image.scale(1);
+    const scale = Math.min(500 / width, 500 / height);
+    
+    page.drawImage(image, {
+      x: (600 - width * scale) / 2,
+      y: (600 - height * scale) / 2,
+      width: width * scale,
+      height: height * scale,
+    });
+    
+    const pdfBytes = await pdfDoc.save();
+    console.log('PDF created successfully');
+    return new Blob([pdfBytes], { type: 'application/pdf' });
+  } catch (error) {
+    console.error('Error creating PDF from image:', error);
+    throw error;
+  }
+};
+
+// Create EPS from SVG paths
+const createEpsFromSvg = (svgString: string): Blob => {
+  try {
+    console.log('Creating EPS from SVG string');
+    
+    // Basic EPS header
+    const epsHeader = `%!PS-Adobe-3.0 EPSF-3.0
+%%BoundingBox: 0 0 600 600
+%%Creator: Logo Exporter
+%%Pages: 1
+%%EndComments
+%%BeginProlog
+/m { moveto } bind def
+/l { lineto } bind def
+/c { curveto } bind def
+/h { closepath } bind def
+/f { fill } bind def
+/s { stroke } bind def
+%%EndProlog
+%%Page: 1 1
+
+% Initialize graphics state
+0 setgray
+1 setlinewidth
+1 setlinecap
+1 setlinejoin
+
+% Center the drawing
+300 300 translate
+
+`;
+    
+    // Parse SVG and extract paths
+    const parser = new DOMParser();
+    const svgDoc = parser.parseFromString(svgString, "image/svg+xml");
+    const paths = svgDoc.querySelectorAll("path");
+    
+    let epsBody = "";
+    paths.forEach(path => {
+      const d = path.getAttribute("d") || "";
+      const postScriptPath = convertSvgPathToPostScript(d);
+      epsBody += `newpath\n${postScriptPath}\nstroke\n`;
+    });
+    
+    const epsFooter = "\nshowpage\n%%EOF";
+    const epsContent = epsHeader + epsBody + epsFooter;
+    
+    console.log('EPS file created successfully');
+    return new Blob([epsContent], { type: 'application/postscript' });
+  } catch (error) {
+    console.error('Error creating EPS:', error);
+    throw error;
+  }
+};
+
+// Helper function to convert SVG path commands to PostScript
+const convertSvgPathToPostScript = (svgPath: string): string => {
+  // Basic conversion of SVG path commands to PostScript
+  return svgPath
+    .replace(/([ML])\s*([0-9.-]+)[,\s]([0-9.-]+)/g, (_, cmd, x, y) => 
+      cmd === 'M' ? `${x} ${y} m\n` : `${x} ${y} l\n`)
+    .replace(/Z/gi, 'h\n')
+    .replace(/([C])\s*([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)/g, 
+      (_, __, x1, y1, x2, y2, x, y) => `${x1} ${y1} ${x2} ${y2} ${x} ${y} c\n`);
+};
+
 export const processLogo = async (
   logoFile: File, 
   settings: ExportSettings
@@ -201,7 +296,7 @@ export const processLogo = async (
               if (formats.includes('EPS')) {
                 try {
                   // For client-side, we generate a simple EPS with metadata that points to the PDF
-                  const epsBlob = await createEpsFromPdf(pdfBlob, brandName, color);
+                  const epsBlob = await createEpsFromPdf(modifiedSvg);
                   
                   const epsFolder = 'EPS';
                   files.push({
@@ -256,7 +351,7 @@ export const processLogo = async (
               if (formats.includes('EPS')) {
                 try {
                   // For client-side, we generate a simple EPS with metadata that points to the PDF
-                  const epsBlob = await createEpsFromPdf(pdfBlob, brandName, color);
+                  const epsBlob = await createEpsFromPdf(modifiedSvg);
                   
                   const epsFolder = 'EPS';
                   files.push({
@@ -297,8 +392,7 @@ export const processLogo = async (
               }
               
               // Create a PDF first, then convert to EPS
-              const pdfBlob = await createPdfFromSvg(modifiedSvg);
-              const epsBlob = await createEpsFromPdf(pdfBlob, brandName, color);
+              const epsBlob = await createEpsFromPdf(modifiedSvg);
               
               const epsFolder = 'EPS';
               files.push({
@@ -334,8 +428,7 @@ export const processLogo = async (
               const pngDataUrl = canvas.toDataURL('image/png');
               
               // Create PDF first, then convert to EPS
-              const pdfBlob = await createPdfFromImage(pngDataUrl);
-              const epsBlob = await createEpsFromPdf(pdfBlob, brandName, color);
+              const epsBlob = await createEpsFromPdf(svgText);
               
               const epsFolder = 'EPS';
               files.push({
@@ -483,66 +576,69 @@ const createPdfFromSvg = async (svgString: string): Promise<Blob> => {
 };
 
 // Function to create an EPS from SVG
-const createEpsFromPdf = async (pdfBlob: Blob, brandName: string, color: string): Promise<Blob> => {
+const createEpsFromPdf = async (svgString: string): Promise<Blob> => {
   try {
-    // Create EPS header with proper metadata and color setup
+    console.log('Creating EPS from SVG string');
+    
+    // Basic EPS header
     const epsHeader = `%!PS-Adobe-3.0 EPSF-3.0
 %%BoundingBox: 0 0 600 600
 %%Creator: Logo Exporter
-%%Title: ${brandName} ${color} Logo
 %%Pages: 1
-%%DocumentData: Clean7Bit
 %%EndComments
 %%BeginProlog
-/bd { bind def } bind def
-/l {lineto} bd
-/m {moveto} bd
-/s {stroke} bd
-/f {fill} bd
-/rgb {setrgbcolor} bd
-/w {setlinewidth} bd
+/m { moveto } bind def
+/l { lineto } bind def
+/c { curveto } bind def
+/h { closepath } bind def
+/f { fill } bind def
+/s { stroke } bind def
 %%EndProlog
 %%Page: 1 1
 
-% Set up initial graphics state
+% Initialize graphics state
+0 setgray
+1 setlinewidth
 1 setlinecap
 1 setlinejoin
-0.1 setlinewidth
 
-% Define logo path
-/DrawLogo {
+% Center the drawing
+300 300 translate
+
 `;
-
-    // Convert PDF to binary string for embedding
-    const pdfArrayBuffer = await pdfBlob.arrayBuffer();
-    const pdfBytes = new Uint8Array(pdfArrayBuffer);
-
-    // Create path instructions for the logo
-    const paths = generateEPSPaths();
     
-    // Create EPS footer
-    const epsFooter = `
-} def
-
-% Draw the logo
-gsave
-300 300 translate  % Center the logo
-1 1 scale         % Set scale
-DrawLogo
-grestore
-
-showpage
-%%EOF`;
-
-    // Combine all parts
-    const epsContent = epsHeader + paths + epsFooter;
-
-    // Create EPS blob
+    // Parse SVG and extract paths
+    const parser = new DOMParser();
+    const svgDoc = parser.parseFromString(svgString, "image/svg+xml");
+    const paths = svgDoc.querySelectorAll("path");
+    
+    let epsBody = "";
+    paths.forEach(path => {
+      const d = path.getAttribute("d") || "";
+      const postScriptPath = convertSvgPathToPostScript(d);
+      epsBody += `newpath\n${postScriptPath}\nstroke\n`;
+    });
+    
+    const epsFooter = "\nshowpage\n%%EOF";
+    const epsContent = epsHeader + epsBody + epsFooter;
+    
+    console.log('EPS file created successfully');
     return new Blob([epsContent], { type: 'application/postscript' });
   } catch (error) {
     console.error('Error creating EPS:', error);
     throw error;
   }
+};
+
+// Helper function to convert SVG path commands to PostScript
+const convertSvgPathToPostScript = (svgPath: string): string => {
+  // Basic conversion of SVG path commands to PostScript
+  return svgPath
+    .replace(/([ML])\s*([0-9.-]+)[,\s]([0-9.-]+)/g, (_, cmd, x, y) => 
+      cmd === 'M' ? `${x} ${y} m\n` : `${x} ${y} l\n`)
+    .replace(/Z/gi, 'h\n')
+    .replace(/([C])\s*([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)[,\s]([0-9.-]+)/g, 
+      (_, __, x1, y1, x2, y2, x, y) => `${x1} ${y1} ${x2} ${y2} ${x} ${y} c\n`);
 };
 
 // Helper function to generate EPS path instructions
@@ -729,34 +825,4 @@ export const downloadZip = (blob: Blob, brandName: string) => {
     link.click();
     
     // Clean up
-    document.body.removeChild(link);
-    setTimeout(() => {
-      URL.revokeObjectURL(url);
-      console.log('Download URL revoked.');
-    }, 100);
-  } catch (error) {
-    console.error('Error during download:', error);
-    throw error;
-  }
-};
-
-// Test function to verify ZIP functionality
-export const testZipDownload = () => {
-  console.log('Testing ZIP functionality...');
-  const zip = new JSZip();
-  zip.file("test.txt", "Hello, world!");
-  
-  zip.generateAsync({ type: "blob" })
-    .then(function (content) {
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(content);
-      link.download = "test.zip";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      console.log("Test ZIP download triggered!");
-    })
-    .catch(function (error) {
-      console.error("Test ZIP generation failed:", error);
-    });
-};
+    document
