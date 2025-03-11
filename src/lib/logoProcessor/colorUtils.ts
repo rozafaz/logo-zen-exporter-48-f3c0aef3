@@ -51,43 +51,134 @@ export const applyInvertedFilter = (ctx: CanvasRenderingContext2D, width: number
   ctx.putImageData(imageData, 0, 0);
 };
 
-// Function to modify the color of an SVG
+// Improved function to modify the color of an SVG
 export const modifySvgColor = (svgString: string, newColor: string): string => {
   try {
-    // Replace fill colors
-    let modifiedSvg = svgString.replace(/fill="[^"]*"/g, `fill="${newColor}"`);
+    const parser = new DOMParser();
+    const serializer = new XMLSerializer();
+    const svgDoc = parser.parseFromString(svgString, 'image/svg+xml');
     
-    // Replace stroke colors
-    modifiedSvg = modifiedSvg.replace(/stroke="[^"]*"/g, `stroke="${newColor}"`);
+    // Function to override fill and stroke for an element
+    function overrideElementColor(el: Element) {
+      // Remove inline styles that may conflict
+      el.removeAttribute('style');
+      
+      // Set fill and stroke attributes
+      if (el.tagName !== 'svg') { // Don't override the root svg element's fill
+        el.setAttribute('fill', newColor);
+        if (el.hasAttribute('stroke') && el.getAttribute('stroke') !== 'none') {
+          el.setAttribute('stroke', newColor);
+        }
+      }
+      
+      // Remove any fill-opacity or stroke-opacity
+      el.removeAttribute('fill-opacity');
+      el.removeAttribute('stroke-opacity');
+    }
     
-    return modifiedSvg;
+    // Process all visual elements
+    const visualElements = svgDoc.querySelectorAll('path, rect, circle, ellipse, line, polyline, polygon, text, tspan, g');
+    visualElements.forEach(overrideElementColor);
+    
+    // Remove any style blocks
+    const styleBlocks = svgDoc.querySelectorAll('style');
+    styleBlocks.forEach(styleEl => {
+      styleEl.textContent = '';
+    });
+    
+    // Handle defs section - remove gradients, patterns, etc.
+    const defs = svgDoc.querySelectorAll('linearGradient, radialGradient, pattern');
+    defs.forEach(def => {
+      // Find elements using this def
+      const id = def.getAttribute('id');
+      if (id) {
+        const users = svgDoc.querySelectorAll(`[fill="url(#${id})"], [stroke="url(#${id})"]`);
+        users.forEach(el => {
+          el.setAttribute('fill', newColor);
+          if (el.hasAttribute('stroke') && el.getAttribute('stroke') !== 'none') {
+            el.setAttribute('stroke', newColor);
+          }
+        });
+      }
+    });
+    
+    return serializer.serializeToString(svgDoc);
   } catch (error) {
     console.error('Error modifying SVG color:', error);
-    return svgString;
+    // Fallback to the basic string replacement if DOM manipulation fails
+    let modifiedSvg = svgString.replace(/fill="[^"]*"/g, `fill="${newColor}"`);
+    modifiedSvg = modifiedSvg.replace(/stroke="[^"]*"/g, `stroke="${newColor}"`);
+    return modifiedSvg;
   }
 };
 
-// Function to invert the colors of an SVG
+// Function to invert the colors of an SVG (updated to use DOM manipulation)
 export const invertSvgColors = (svgString: string): string => {
   try {
-    // Use a regular expression to find and replace all color values
-    let modifiedSvg = svgString.replace(/(fill|stroke)="(#([0-9a-fA-F]{3}){1,2}|[a-zA-Z]+)"/g, (match, p1, color) => {
-      // Convert the color to RGB
-      const rgb = hexToRgb(color);
-      if (!rgb) return match;
+    const parser = new DOMParser();
+    const serializer = new XMLSerializer();
+    const svgDoc = parser.parseFromString(svgString, 'image/svg+xml');
+    
+    // Function to invert the color of an element
+    function invertElementColor(el: Element) {
+      // Remove inline styles that may conflict
+      el.removeAttribute('style');
       
-      // Invert the RGB values
-      const invertedR = 255 - rgb.r;
-      const invertedG = 255 - rgb.g;
-      const invertedB = 255 - rgb.b;
+      // Invert fill and stroke attributes
+      if (el.tagName !== 'svg') { // Don't invert the root svg element's fill
+        const fill = el.getAttribute('fill');
+        const stroke = el.getAttribute('stroke');
+        
+        if (fill) {
+          const rgb = hexToRgb(fill);
+          if (rgb) {
+            const invertedR = 255 - rgb.r;
+            const invertedG = 255 - rgb.g;
+            const invertedB = 255 - rgb.b;
+            el.setAttribute('fill', `#${invertedR.toString(16).padStart(2, '0')}${invertedG.toString(16).padStart(2, '0')}${invertedB.toString(16).padStart(2, '0')}`);
+          }
+        }
+        
+        if (stroke && stroke !== 'none') {
+          const rgb = hexToRgb(stroke);
+          if (rgb) {
+            const invertedR = 255 - rgb.r;
+            const invertedG = 255 - rgb.g;
+            const invertedB = 255 - rgb.b;
+            el.setAttribute('stroke', `#${invertedR.toString(16).padStart(2, '0')}${invertedG.toString(16).padStart(2, '0')}${invertedB.toString(16).padStart(2, '0')}`);
+          }
+        }
+      }
       
-      // Convert the inverted RGB values back to hex
-      const invertedHex = `#${invertedR.toString(16).padStart(2, '0')}${invertedG.toString(16).padStart(2, '0')}${invertedB.toString(16).padStart(2, '0')}`;
-      
-      return `${p1}="${invertedHex}"`;
+      // Remove any fill-opacity or stroke-opacity
+      el.removeAttribute('fill-opacity');
+      el.removeAttribute('stroke-opacity');
+    }
+    
+    // Process all visual elements
+    const visualElements = svgDoc.querySelectorAll('path, rect, circle, ellipse, line, polyline, polygon, text, tspan, g');
+    visualElements.forEach(invertElementColor);
+    
+    // Remove any style blocks
+    const styleBlocks = svgDoc.querySelectorAll('style');
+    styleBlocks.forEach(styleEl => {
+      styleEl.textContent = '';
     });
     
-    return modifiedSvg;
+    // Handle defs section - remove gradients, patterns, etc.
+    const defs = svgDoc.querySelectorAll('linearGradient, radialGradient, pattern');
+    defs.forEach(def => {
+      // Find elements using this def
+      const id = def.getAttribute('id');
+      if (id) {
+        const users = svgDoc.querySelectorAll(`[fill="url(#${id})"], [stroke="url(#${id})"]`);
+        users.forEach(el => {
+          invertElementColor(el);
+        });
+      }
+    });
+    
+    return serializer.serializeToString(svgDoc);
   } catch (error) {
     console.error('Error inverting SVG colors:', error);
     return svgString;
