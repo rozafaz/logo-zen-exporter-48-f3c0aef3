@@ -11,7 +11,7 @@ export const convertRectElement = (
   const width = parseFloat(element.getAttribute('width') || '0');
   const height = parseFloat(element.getAttribute('height') || '0');
   const rx = parseFloat(element.getAttribute('rx') || '0');
-  const ry = parseFloat(element.getAttribute('ry') || rx);
+  const ry = parseFloat(element.getAttribute('ry') || rx.toString());
   
   if (width <= 0 || height <= 0) return '';
   
