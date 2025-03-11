@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { 
@@ -88,13 +87,6 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
               description="Vector document"
               isSelected={isSelected('formats', 'PDF')}
               onClick={() => toggleOption('formats', 'PDF')}
-            />
-            <FormatOption 
-              icon={<File className="w-4 h-4" />}
-              label="EPS" 
-              description="Print format"
-              isSelected={isSelected('formats', 'EPS')}
-              onClick={() => toggleOption('formats', 'EPS')}
             />
             <FormatOption 
               icon={<Image className="w-4 h-4" />}

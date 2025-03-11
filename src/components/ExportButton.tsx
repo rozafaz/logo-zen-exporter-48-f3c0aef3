@@ -49,12 +49,6 @@ const ExportButton: React.FC<ExportButtonProps> = ({
       console.log('Starting export process with settings:', settings);
       console.log('Logo file type:', logoFile.type, 'name:', logoFile.name, 'size:', logoFile.size);
       
-      // Check if EPS is selected to provide additional logging
-      if (settings.formats.includes('EPS')) {
-        console.log('EPS format selected - will ensure proper vector conversion');
-        toast.info('Generating EPS file with vector data...', { duration: 2000 });
-      }
-      
       // Perform export
       await exportLogoPackage(logoFile, settings);
       

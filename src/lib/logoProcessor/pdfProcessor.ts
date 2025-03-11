@@ -1,6 +1,6 @@
 
 import { createPdfFromSvg, createPdfFromImage } from './pdfUtils';
-import { applyColorToSvg, createSimpleSvgFromRaster, processEpsFromSvg, getSvgDimensions } from './svgUtils';
+import { applyColorToSvg, createSimpleSvgFromRaster, getSvgDimensions } from './svgUtils';
 import { applyColorFilter } from './rasterUtils';
 import type { ProcessedFile } from './types';
 
@@ -11,8 +11,7 @@ export const processPdfFromSvg = async (
   svgText: string,
   color: string,
   brandName: string,
-  colors: string[],
-  includeEps: boolean
+  colors: string[]
 ): Promise<ProcessedFile[]> => {
   const files: ProcessedFile[] = [];
   
@@ -37,12 +36,6 @@ export const processPdfFromSvg = async (
     });
     
     console.log(`Created vector PDF from SVG for ${color}, size: ${pdfBlob.size} bytes`);
-    
-    // Also create EPS from the PDF if EPS is selected
-    if (includeEps) {
-      const epsFiles = processEpsFromSvg(modifiedSvg, color, brandName, colors);
-      files.push(...epsFiles);
-    }
   } catch (error) {
     console.error('Error creating PDF from SVG:', error);
   }
@@ -59,8 +52,7 @@ export const processPdfFromRaster = async (
   originalLogo: HTMLImageElement,
   color: string,
   brandName: string,
-  colors: string[],
-  includeEps: boolean
+  colors: string[]
 ): Promise<ProcessedFile[]> => {
   const files: ProcessedFile[] = [];
   const baseWidth = originalLogo.width || 300;
@@ -94,19 +86,6 @@ export const processPdfFromRaster = async (
     });
     
     console.log(`Created PDF from raster for ${color}, size: ${pdfBlob.size} bytes`);
-    
-    // Also create EPS if requested
-    if (includeEps) {
-      try {
-        // For raster images, convert to SVG path (simplified)
-        const simpleSvg = createSimpleSvgFromRaster(baseWidth, baseHeight, color);
-        
-        const epsFiles = processEpsFromSvg(simpleSvg, color, brandName, colors);
-        files.push(...epsFiles);
-      } catch (error) {
-        console.error('Error creating EPS from raster:', error);
-      }
-    }
   } catch (error) {
     console.error('Error creating PDF from raster:', error);
   }

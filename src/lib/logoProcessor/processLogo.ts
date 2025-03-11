@@ -1,7 +1,7 @@
 
 import type { ExportSettings, ProcessedFile } from './types';
 import { processRasterFormats, processIcoFormat } from './rasterUtils';
-import { processSvgFormat, processEpsFromSvg } from './svgUtils';
+import { processSvgFormat } from './svgUtils';
 import { processPdfFromSvg, processPdfFromRaster } from './pdfProcessor';
 
 export const processLogo = async (
@@ -69,29 +69,18 @@ export const processLogo = async (
         }
         // Handle PDF files
         else if (format === 'PDF') {
-          const includeEps = formats.includes('EPS');
-          
           // For SVG input, we can use pdf-lib's SVG embedding
           if (logoFile.type === 'image/svg+xml' || logoFile.name.toLowerCase().endsWith('.svg')) {
-            const pdfFiles = await processPdfFromSvg(svgText, color, brandName, colors, includeEps);
+            const pdfFiles = await processPdfFromSvg(svgText, color, brandName, colors);
             files.push(...pdfFiles);
           } 
           // For raster input, we draw on a canvas and create a PDF
           else {
             const pdfFiles = await processPdfFromRaster(
-              ctx, canvas, originalLogo, color, brandName, colors, includeEps
+              ctx, canvas, originalLogo, color, brandName, colors
             );
             files.push(...pdfFiles);
           }
-        }
-        // Handle EPS files - if not already created via PDF
-        else if (format === 'EPS' && !formats.includes('PDF')) {
-          // For SVG input
-          if (logoFile.type === 'image/svg+xml' || logoFile.name.toLowerCase().endsWith('.svg')) {
-            const epsFiles = processEpsFromSvg(svgText, color, brandName, colors);
-            files.push(...epsFiles);
-          } 
-          // For raster input - already handled in other cases
         }
         // Handle ICO files (favicon)
         else if (format === 'ICO') {

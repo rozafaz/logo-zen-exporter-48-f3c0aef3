@@ -1,5 +1,5 @@
+
 import { modifySvgColor, invertSvgColors } from './colorUtils';
-import { createEpsFromSvg } from './vectorUtils';
 import type { ProcessedFile } from './types';
 
 /**
@@ -31,79 +31,6 @@ export const processSvgFormat = async (
     console.log(`Created SVG file for ${color} variation, size: ${svgBlob.size} bytes`);
   } catch (error) {
     console.error('Error processing SVG:', error);
-  }
-  
-  return files;
-};
-
-/**
- * Processes EPS format directly from SVG with improved vector conversion
- */
-export const processEpsFromSvg = (
-  svgText: string,
-  color: string,
-  brandName: string,
-  colors: string[]
-): ProcessedFile[] => {
-  const files: ProcessedFile[] = [];
-  
-  try {
-    console.log('Generating EPS directly for', color);
-    
-    // Apply color modifications if needed
-    let modifiedSvg = applyColorToSvg(svgText, color, colors);
-    
-    // Log SVG content preview for debugging
-    console.log('Modified SVG preview (first 100 chars):', modifiedSvg.substring(0, 100));
-    
-    // Create EPS directly from SVG with enhanced processing
-    const epsBlob = createEpsFromSvg(modifiedSvg);
-    
-    // Validate that EPS has sufficient content
-    if (epsBlob.size < 500) {
-      console.warn('Warning: EPS file is suspiciously small:', epsBlob.size, 'bytes');
-    } else {
-      console.log('EPS generation successful, size:', epsBlob.size, 'bytes');
-    }
-    
-    const epsFolder = 'EPS';
-    files.push({
-      folder: epsFolder,
-      filename: `${brandName}_${color}.eps`,
-      data: epsBlob
-    });
-    
-    console.log(`Created EPS directly for ${color}, size: ${epsBlob.size} bytes`);
-  } catch (error) {
-    console.error('Error creating EPS:', error);
-    
-    // Create a minimal fallback EPS with visible content
-    const fallbackContent = `%!PS-Adobe-3.0 EPSF-3.0
-%%BoundingBox: 0 0 400 400
-%%Creator: Logo Package Generator Fallback
-%%Title: Fallback Vector Logo
-%%Pages: 1
-%%EndComments
-
-200 200 100 0 360 arc
-closepath
-0 0 0 setrgbcolor
-fill
-
-showpage
-%%EOF`;
-    
-    const fallbackBlob = new Blob([fallbackContent], { type: 'application/postscript' });
-    
-    // Add fallback EPS
-    const epsFolder = 'EPS';
-    files.push({
-      folder: epsFolder,
-      filename: `${brandName}_${color}_fallback.eps`,
-      data: fallbackBlob
-    });
-    
-    console.log(`Created fallback EPS for ${color} due to error, size: ${fallbackBlob.size} bytes`);
   }
   
   return files;
