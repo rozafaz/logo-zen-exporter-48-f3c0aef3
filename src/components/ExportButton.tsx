@@ -49,6 +49,12 @@ const ExportButton: React.FC<ExportButtonProps> = ({
       console.log('Starting export process with settings:', settings);
       console.log('Logo file type:', logoFile.type, 'name:', logoFile.name, 'size:', logoFile.size);
       
+      // Check if EPS format is selected
+      if (settings.formats.includes('EPS') && 
+          !(logoFile.type === 'image/svg+xml' || logoFile.name.toLowerCase().endsWith('.svg'))) {
+        toast.warning('EPS format is only available for SVG input files. The EPS format will be skipped.');
+      }
+      
       // Perform export
       await exportLogoPackage(logoFile, settings);
       

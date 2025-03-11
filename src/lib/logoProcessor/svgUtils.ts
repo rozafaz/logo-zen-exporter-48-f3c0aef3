@@ -77,33 +77,6 @@ export const createSimpleSvgFromRaster = (
 };
 
 /**
- * Extracts path data from SVG for vector PDF creation
- */
-export const extractSvgPathsForPdf = (svgText: string): string[] => {
-  const paths: string[] = [];
-  
-  // Find all path elements
-  const pathRegex = /<path[^>]*d=["']([^"']+)["'][^>]*>/g;
-  let match;
-  
-  while ((match = pathRegex.exec(svgText)) !== null) {
-    paths.push(match[1]);
-  }
-  
-  // Find all rect elements and convert to paths
-  const rectRegex = /<rect[^>]*x=["']([^"']+)["'][^>]*y=["']([^"']+)["'][^>]*width=["']([^"']+)["'][^>]*height=["']([^"']+)["'][^>]*>/g;
-  
-  while ((match = rectRegex.exec(svgText)) !== null) {
-    const [, x, y, width, height] = match;
-    // Convert rect to path d attribute
-    const pathD = `M ${x} ${y} h ${width} v ${height} h -${width} Z`;
-    paths.push(pathD);
-  }
-  
-  return paths;
-};
-
-/**
  * Gets SVG dimensions from viewBox or width/height attributes
  */
 export const getSvgDimensions = (svgText: string): { width: number; height: number } => {
@@ -135,3 +108,4 @@ export const getSvgDimensions = (svgText: string): { width: number; height: numb
   
   return { width, height };
 };
+

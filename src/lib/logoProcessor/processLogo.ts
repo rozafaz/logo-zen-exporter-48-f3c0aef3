@@ -3,6 +3,7 @@ import type { ExportSettings, ProcessedFile } from './types';
 import { processRasterFormats, processIcoFormat } from './rasterUtils';
 import { processSvgFormat } from './svgUtils';
 import { processPdfFromSvg, processPdfFromRaster } from './pdfProcessor';
+import { createEpsFromSvg } from './epsUtils';
 
 export const processLogo = async (
   logoFile: File, 
@@ -81,6 +82,12 @@ export const processLogo = async (
             );
             files.push(...pdfFiles);
           }
+        }
+        // Handle EPS files - only available for SVG input
+        else if (format === 'EPS' && (logoFile.type === 'image/svg+xml' || logoFile.name.toLowerCase().endsWith('.svg'))) {
+          console.log('Processing EPS format for SVG input');
+          const epsFiles = await createEpsFromSvg(svgText, color, brandName);
+          files.push(...epsFiles);
         }
         // Handle ICO files (favicon)
         else if (format === 'ICO') {

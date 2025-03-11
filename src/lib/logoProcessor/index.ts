@@ -8,3 +8,5 @@ export * from './pdfUtils';
 export * from './rasterUtils';
 export * from './svgUtils';
 export * from './pdfProcessor';
+export * from './epsUtils';
+
