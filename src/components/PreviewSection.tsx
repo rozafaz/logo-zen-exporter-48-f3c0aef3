@@ -2,7 +2,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
-import { FileImage, FileVector, FolderTree, BrandFolder } from 'lucide-react';
+import { File, Image, Folder, FolderTree } from 'lucide-react';
 import type { ExportSettings } from './ExportOptions';
 
 interface PreviewSectionProps {
@@ -23,12 +23,12 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
       formats.forEach(format => {
         if (['PNG', 'JPG'].includes(format)) {
           resolutions.forEach(resolution => {
-            const icon = <FileImage className="w-4 h-4" />;
+            const icon = <Image className="w-4 h-4" />;
             const name = `${brandName}_${color}_${format}_${resolution}.${format.toLowerCase()}`;
             files.push({ icon, name });
           });
         } else {
-          const icon = <FileVector className="w-4 h-4" />;
+          const icon = <File className="w-4 h-4" />;
           const name = `${brandName}_${color}_${format}.${format.toLowerCase()}`;
           files.push({ icon, name });
         }
@@ -70,7 +70,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
           <div className="text-sm font-medium mb-2">Folder Structure</div>
           <div className="bg-gray-100 rounded-lg p-4 h-[120px] overflow-y-auto text-sm">
             <div className="flex items-center">
-              <BrandFolder className="w-4 h-4 mr-2 text-primary" />
+              <Folder className="w-4 h-4 mr-2 text-primary" />
               <span className="font-medium">{settings.brandName} Logo Package</span>
             </div>
             

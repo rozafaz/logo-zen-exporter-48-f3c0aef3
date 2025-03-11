@@ -6,7 +6,7 @@ import {
 } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { 
-  CheckCircle, CheckCircle2, Circle, Image, FileImage, FileVector, Check
+  CheckCircle, CheckCircle2, Circle, Image, File, Check
 } from 'lucide-react';
 
 export interface ExportSettings {
@@ -62,35 +62,35 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
           <h3 className="font-medium mb-3">Export Formats</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
             <FormatOption 
-              icon={<FileImage className="w-4 h-4" />}
+              icon={<Image className="w-4 h-4" />}
               label="PNG" 
               description="Raster with transparency"
               isSelected={isSelected('formats', 'PNG')}
               onClick={() => toggleOption('formats', 'PNG')} 
             />
             <FormatOption 
-              icon={<FileVector className="w-4 h-4" />}
+              icon={<File className="w-4 h-4" />}
               label="SVG" 
               description="Vector format"
               isSelected={isSelected('formats', 'SVG')}
               onClick={() => toggleOption('formats', 'SVG')}
             />
             <FormatOption 
-              icon={<FileImage className="w-4 h-4" />}
+              icon={<Image className="w-4 h-4" />}
               label="JPG" 
               description="Raster format"
               isSelected={isSelected('formats', 'JPG')}
               onClick={() => toggleOption('formats', 'JPG')}
             />
             <FormatOption 
-              icon={<FileVector className="w-4 h-4" />}
+              icon={<File className="w-4 h-4" />}
               label="PDF" 
               description="Vector document"
               isSelected={isSelected('formats', 'PDF')}
               onClick={() => toggleOption('formats', 'PDF')}
             />
             <FormatOption 
-              icon={<FileVector className="w-4 h-4" />}
+              icon={<File className="w-4 h-4" />}
               label="EPS" 
               description="Print format"
               isSelected={isSelected('formats', 'EPS')}
