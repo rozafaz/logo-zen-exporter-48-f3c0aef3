@@ -1,3 +1,4 @@
+
 import { PDFDocument, rgb } from 'pdf-lib';
 import { getPostScriptColor } from './vectorUtils';
 import { createPostScriptHeader, createPostScriptFooter } from './postscriptUtils';
@@ -216,32 +217,58 @@ export const convertPdfToEps = async (pdfBlob: Blob): Promise<Blob> => {
     const page = pdfDoc.getPages()[0];
     const { width, height } = page.getSize();
 
-    // Extract paths from PDF and convert to PostScript
-    const paths = extractSimplePaths(await pdfBlob.text());
+    // Initialize EPS content with proper header
     let epsContent = createPostScriptHeader(width, height);
+    
+    // Set up initial graphics state
+    epsContent += `
+% Initialize graphics state
+1 setlinewidth
+0 setlinecap
+0 setlinejoin
+1 1 1 setrgbcolor % Set default color to white
 
-    // Convert each path to PostScript commands with proper scaling and positioning
-    paths.forEach(path => {
-      const color = getPostScriptColor(path.fill || '#000000');
-      if (path.type === 'path') {
-        epsContent += `\n% Path\n${color} rgb\nn\n${path.d}\ncp\nf\n`;
-      } else if (path.type === 'rect') {
-        const x = path.x || 0;
-        const y = height - (path.y || 0) - (path.height || 0); // Flip Y coordinates
-        epsContent += `\n% Rectangle\n${color} rgb\nn\n${x} ${y} m\n${x + path.width} ${y} l\n${x + path.width} ${y + path.height} l\n${x} ${y + path.height} l\ncp\nf\n`;
-      } else if (path.type === 'circle') {
-        const cx = path.cx || 0;
-        const cy = height - (path.cy || 0); // Flip Y coordinates
-        const r = path.r || 0;
-        epsContent += `\n% Circle\n${color} rgb\nn\n${cx} ${cy} ${r} 0 360 arc\ncp\nf\n`;
+% Begin vector content
+`;
+
+    // Extract paths from PDF and convert to PostScript commands
+    const paths = await page.getPaths();
+    for (const path of paths) {
+      const operations = path.getOperations();
+      for (const op of operations) {
+        switch (op.operator) {
+          case 'm':
+            epsContent += `${op.args[0]} ${op.args[1]} moveto\n`;
+            break;
+          case 'l':
+            epsContent += `${op.args[0]} ${op.args[1]} lineto\n`;
+            break;
+          case 'c':
+            epsContent += `${op.args[0]} ${op.args[1]} ${op.args[2]} ${op.args[3]} ${op.args[4]} ${op.args[5]} curveto\n`;
+            break;
+          case 'h':
+            epsContent += `closepath\n`;
+            break;
+          case 'f':
+            epsContent += `fill\n`;
+            break;
+          case 's':
+            epsContent += `stroke\n`;
+            break;
+        }
       }
-    });
+    }
 
+    // Add footer
     epsContent += createPostScriptFooter();
 
-    return new Blob([epsContent], { type: 'application/postscript' });
+    // Create EPS blob with proper MIME type
+    return new Blob([epsContent], { 
+      type: 'application/postscript'
+    });
   } catch (error) {
     console.error('Error converting PDF to EPS:', error);
     throw error;
   }
 };
+

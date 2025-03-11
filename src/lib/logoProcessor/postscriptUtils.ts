@@ -23,6 +23,9 @@ export const createPostScriptHeader = (width: number, height: number): string =>
 /n { newpath } bd
 /gs { gsave } bd
 /gr { grestore } bd
+/tr { translate } bd
+/sc { scale } bd
+/ro { rotate } bd
 %%EndProlog
 
 %%BeginSetup
