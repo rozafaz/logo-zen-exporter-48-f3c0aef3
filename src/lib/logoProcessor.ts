@@ -1,3 +1,4 @@
+
 import JSZip from 'jszip';
 import { PDFDocument } from 'pdf-lib';
 import type { ExportSettings } from '@/components/ExportOptions';
@@ -825,4 +826,14 @@ export const downloadZip = (blob: Blob, brandName: string) => {
     link.click();
     
     // Clean up
-    document
+    document.body.removeChild(link);
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 100);
+    
+    console.log('Download initiated successfully');
+  } catch (error) {
+    console.error('Error downloading ZIP:', error);
+    throw error;
+  }
+};
