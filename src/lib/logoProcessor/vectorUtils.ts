@@ -293,7 +293,7 @@ export function processOtherSvgElements(svgDoc: Document, epsData: string): stri
   return result;
 }
 
-// Convert SVG path commands to PostScript commands
+// Convert SVG path commands to PostScript commands with improved bounding box handling
 export function convertSVGPathToPostScript(d: string): string {
   let result = "";
   
@@ -311,17 +311,18 @@ export function convertSVGPathToPostScript(d: string): string {
   let prevCommand = '';
   
   let i = 0;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  
   while (i < tokens.length) {
     const token = tokens[i];
     
     if (/[MLHVCSQTAZmlhvcsqtaz]/.test(token)) {
-      // It's a command
       const command = token;
       i++;
       
       switch (command) {
-        case 'M': // Absolute moveto
-        case 'm': // Relative moveto
+        case 'M':
+        case 'm':
           while (i < tokens.length && !isNaN(parseFloat(tokens[i]))) {
             const x = parseFloat(tokens[i++]);
             const y = parseFloat(tokens[i++]);
@@ -334,6 +335,12 @@ export function convertSVGPathToPostScript(d: string): string {
               currentY = y;
             }
             
+            // Update bounding box
+            minX = Math.min(minX, currentX);
+            minY = Math.min(minY, currentY);
+            maxX = Math.max(maxX, currentX);
+            maxY = Math.max(maxY, currentY);
+            
             if (prevCommand === '') {
               firstX = currentX;
               firstY = currentY;
@@ -343,8 +350,8 @@ export function convertSVGPathToPostScript(d: string): string {
           }
           break;
           
-        case 'L': // Absolute lineto
-        case 'l': // Relative lineto
+        case 'L':
+        case 'l':
           while (i < tokens.length && !isNaN(parseFloat(tokens[i]))) {
             const x = parseFloat(tokens[i++]);
             const y = parseFloat(tokens[i++]);
@@ -357,12 +364,18 @@ export function convertSVGPathToPostScript(d: string): string {
               currentY = y;
             }
             
+            // Update bounding box
+            minX = Math.min(minX, currentX);
+            minY = Math.min(minY, currentY);
+            maxX = Math.max(maxX, currentX);
+            maxY = Math.max(maxY, currentY);
+            
             result += `${currentX} ${currentY} lineto\n`;
           }
           break;
           
-        case 'H': // Absolute horizontal lineto
-        case 'h': // Relative horizontal lineto
+        case 'H':
+        case 'h':
           while (i < tokens.length && !isNaN(parseFloat(tokens[i]))) {
             const x = parseFloat(tokens[i++]);
             
@@ -376,8 +389,8 @@ export function convertSVGPathToPostScript(d: string): string {
           }
           break;
           
-        case 'V': // Absolute vertical lineto
-        case 'v': // Relative vertical lineto
+        case 'V':
+        case 'v':
           while (i < tokens.length && !isNaN(parseFloat(tokens[i]))) {
             const y = parseFloat(tokens[i++]);
             
@@ -391,8 +404,8 @@ export function convertSVGPathToPostScript(d: string): string {
           }
           break;
           
-        case 'C': // Absolute cubic Bezier curve
-        case 'c': // Relative cubic Bezier curve
+        case 'C':
+        case 'c':
           while (i < tokens.length && !isNaN(parseFloat(tokens[i]))) {
             const x1 = parseFloat(tokens[i++]);
             const y1 = parseFloat(tokens[i++]);
@@ -426,8 +439,8 @@ export function convertSVGPathToPostScript(d: string): string {
           }
           break;
           
-        case 'Z': // Closepath
-        case 'z': // Closepath
+        case 'Z':
+        case 'z':
           result += `closepath\n`;
           currentX = firstX;
           currentY = firstY;
@@ -435,7 +448,6 @@ export function convertSVGPathToPostScript(d: string): string {
           break;
           
         default:
-          // Skip unsupported commands for now
           i++;
           while (i < tokens.length && !isNaN(parseFloat(tokens[i]))) {
             i++;
@@ -444,10 +456,19 @@ export function convertSVGPathToPostScript(d: string): string {
       
       prevCommand = command;
     } else {
-      // Skip non-command, non-number tokens
       i++;
     }
   }
   
+  // Add bounding box information as a comment
+  result = `% BoundingBox: ${Math.floor(minX)} ${Math.floor(minY)} ${Math.ceil(maxX)} ${Math.ceil(maxY)}\n` + result;
+  
   return result;
+}
+
+// Add new helper to format PostScript color commands
+export function getPostScriptColor(color: string): string {
+  const rgb = hexToRgb(color);
+  if (!rgb) return '0 0 0'; // Default to black if invalid color
+  return `${(rgb.r / 255).toFixed(3)} ${(rgb.g / 255).toFixed(3)} ${(rgb.b / 255).toFixed(3)}`;
 }

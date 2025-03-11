@@ -1,4 +1,6 @@
 import { PDFDocument, rgb } from 'pdf-lib';
+import { getPostScriptColor } from './vectorUtils';
+import { createPostScriptHeader, createPostScriptFooter } from './postscriptUtils';
 
 /**
  * Creates a PDF from SVG text while preserving vector information
@@ -202,6 +204,33 @@ export const createPdfFromImage = async (imageDataUrl: string): Promise<Blob> =>
     return pdfBlob;
   } catch (error) {
     console.error('Error in createPdfFromImage:', error);
+    throw error;
+  }
+};
+
+// Convert vector PDF paths to EPS
+export const convertPdfToEps = async (pdfBlob: Blob): Promise<Blob> => {
+  try {
+    const arrayBuffer = await pdfBlob.arrayBuffer();
+    const pdfDoc = await PDFDocument.load(arrayBuffer);
+    const page = pdfDoc.getPages()[0];
+    const { width, height } = page.getSize();
+
+    // Extract paths from PDF and convert to PostScript
+    const paths = extractSimplePaths(await pdfBlob.text());
+    let epsContent = createPostScriptHeader(width, height);
+
+    // Convert each path to PostScript commands
+    paths.forEach(path => {
+      const color = getPostScriptColor(path.fill || '#000000');
+      epsContent += `\n% Path\n${color} rgb\nnewpath\n${path.d}\nfill\n`;
+    });
+
+    epsContent += createPostScriptFooter();
+
+    return new Blob([epsContent], { type: 'application/postscript' });
+  } catch (error) {
+    console.error('Error converting PDF to EPS:', error);
     throw error;
   }
 };
