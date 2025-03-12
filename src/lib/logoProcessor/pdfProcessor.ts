@@ -1,4 +1,3 @@
-
 import { createPdfFromSvg, createPdfFromImage } from './pdf';
 import { applyColorToSvg, createSimpleSvgFromRaster, getSvgDimensions } from './svgUtils';
 import { applyColorFilter } from './rasterUtils';
@@ -18,8 +17,23 @@ export const processPdfFromSvg = async (
   try {
     console.log('Generating vector PDF from SVG for', color);
     
-    // Apply color modifications if needed - using the same color function as SVG exports
-    let modifiedSvg = applyColorToSvg(svgText, color, colors);
+    // Apply color modifications based on the requested color variation
+    let modifiedSvg = svgText;
+    
+    // For specific color variations, apply special color handling
+    if (color === 'black') {
+      // Convert all elements to black
+      modifiedSvg = applyColorToSvg(svgText, '#000000', colors);
+    } else if (color === 'white') {
+      // Convert all elements to white
+      modifiedSvg = applyColorToSvg(svgText, '#FFFFFF', colors);
+    } else if (color === 'original') {
+      // Keep original colors from the SVG
+      modifiedSvg = svgText;
+    } else {
+      // Apply specific color as requested
+      modifiedSvg = applyColorToSvg(svgText, color, colors);
+    }
     
     // Extract dimensions for better positioning
     const dimensions = getSvgDimensions(modifiedSvg);
@@ -69,8 +83,10 @@ export const processPdfFromRaster = async (
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(originalLogo, 0, 0, canvas.width, canvas.height);
     
-    // Apply color variations - using the same filters used for raster exports
-    applyColorFilter(ctx, canvas.width, canvas.height, color, colors);
+    // Apply the correct color variation - consistent with raster exports
+    if (color !== 'original') {
+      applyColorFilter(ctx, canvas.width, canvas.height, color, colors);
+    }
     
     // Convert canvas to PNG for embedding in PDF
     const pngDataUrl = canvas.toDataURL('image/png');
