@@ -1,5 +1,5 @@
 
-import { PDFDocument, rgb } from 'pdf-lib';
+import { PDFDocument, rgb, ColorTypes } from 'pdf-lib';
 import { getPostScriptColor } from '../vectorUtils';
 
 /**
@@ -30,15 +30,8 @@ export const createPdfFromSvg = async (svgString: string): Promise<Blob> => {
     const pageHeight = 600;
     const page = pdfDoc.addPage([pageWidth, pageHeight]);
     
-    // Create an SVG Data URI
+    // Create an SVG Data URI for embedding
     const svgDataUri = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svgString)))}`;
-    
-    // Create a form XObject from the SVG
-    await fetch(svgDataUri)
-      .then(response => response.arrayBuffer())
-      .then(async buffer => {
-        return buffer;
-      });
     
     // Calculate dimensions to maintain aspect ratio while centering
     const scale = Math.min(pageWidth * 0.8 / width, pageHeight * 0.8 / height);
@@ -47,45 +40,53 @@ export const createPdfFromSvg = async (svgString: string): Promise<Blob> => {
     const x = (pageWidth - width * scale) / 2;
     const y = (pageHeight - height * scale) / 2;
     
-    // Add vector content to page
-    const paths = extractSimplePaths(svgString);
+    // Add vector content to page with improved gradient and transparency support
+    const elementsWithStyles = extractSvgElementsWithStyles(svgString);
     
     // Draw the paths with their fill colors and proper positioning
-    paths.forEach((pathData) => {
-      // Convert the fill color to RGB values for pdf-lib
-      const fillColor = pathData.fill || '#000000';
-      const rgbColor = hexToRgb(fillColor);
-      const pdfColor = rgbColor ? rgb(rgbColor.r / 255, rgbColor.g / 255, rgbColor.b / 255) : rgb(0, 0, 0);
-      
-      if (pathData.type === 'rect') {
-        page.drawRectangle({
-          x: x + (pathData.x || 0) * scale,
-          y: y + ((height - (pathData.y || 0) - (pathData.height || 0))) * scale,
-          width: (pathData.width || 10) * scale,
-          height: (pathData.height || 10) * scale,
-          color: pdfColor,
-          opacity: pathData.opacity || 1,
-          borderWidth: 0,
-        });
-      } else if (pathData.type === 'circle') {
-        page.drawCircle({
-          x: x + (pathData.cx || width/2) * scale,
-          y: y + ((height - (pathData.cy || height/2))) * scale,
-          size: (pathData.r || 10) * scale * 2,
-          color: pdfColor,
-          borderWidth: 0,
-          opacity: pathData.opacity || 1,
-        });
-      } else if (pathData.type === 'path') {
-        page.drawSvgPath(pathData.d || `M ${x} ${y} L ${x+10*scale} ${y+10*scale}`, {
-          x: x,
-          y: y + height * scale,
-          scale: scale,
-          color: pdfColor,
-          borderWidth: 0,
-          opacity: pathData.opacity || 1,
-        });
+    elementsWithStyles.forEach((element) => {
+      // Handle each element based on its type
+      if (element.type === 'rect') {
+        // For rectangles, we directly use the PDF drawing operations
+        drawRectangle(page, element, x, y, height, scale);
+      } else if (element.type === 'circle') {
+        // For circles, we directly use the PDF drawing operations
+        drawCircle(page, element, x, y, height, scale);
+      } else if (element.type === 'ellipse') {
+        // For ellipses, we approximate with bezier curves
+        drawEllipse(page, element, x, y, height, scale);
+      } else if (element.type === 'path') {
+        // For paths, we use the drawSvgPath method
+        drawPath(page, element, x, y, height, scale);
+      } else if (element.type === 'polygon' || element.type === 'polyline') {
+        // For polygons and polylines, we convert to paths
+        drawPolygon(page, element, x, y, height, scale);
       }
+    });
+    
+    // Handle gradient references (this is a simplified approach)
+    // In a full implementation, this would properly render gradients
+    // by creating gradient fills in the PDF
+    const gradientElements = extractGradients(svgString);
+    gradientElements.forEach(gradient => {
+      // We simplify gradients with a solid color approximation for now
+      // A more complete solution would implement actual PDF gradients
+      const averageColor = approximateGradientColor(gradient);
+      
+      // Find elements referencing this gradient and apply the average color
+      elementsWithStyles.forEach(element => {
+        if (element.fill && element.fill.includes(`url(#${gradient.id})`)) {
+          element.simplifiedFill = averageColor;
+          
+          // Redraw with the simplified color
+          if (element.type === 'rect') {
+            drawRectangle(page, { ...element, fill: averageColor }, x, y, height, scale);
+          } else if (element.type === 'path') {
+            drawPath(page, { ...element, fill: averageColor }, x, y, height, scale);
+          }
+          // Handle other element types similarly
+        }
+      });
     });
     
     // Save the PDF to bytes
@@ -103,140 +104,327 @@ export const createPdfFromSvg = async (svgString: string): Promise<Blob> => {
 };
 
 /**
- * Helper function to extract basic paths and shapes from SVG with improved color handling
+ * Helper function to draw rectangles with proper colors and opacity
  */
-function extractSimplePaths(svgString: string): Array<{type: string, [key: string]: any}> {
-  const shapes: Array<{type: string, [key: string]: any}> = [];
+function drawRectangle(page: any, element: any, baseX: number, baseY: number, svgHeight: number, scale: number) {
+  const x = element.x !== undefined ? baseX + element.x * scale : baseX;
+  const y = element.y !== undefined ? baseY + (svgHeight - element.y - element.height) * scale : baseY;
+  const width = element.width !== undefined ? element.width * scale : 10 * scale;
+  const height = element.height !== undefined ? element.height * scale : 10 * scale;
   
-  // Convert some strokes to fills for better representation
-  const fixedSvgString = svgString
-    .replace(/stroke="([^"]+)"([^>]*?)fill="none"/g, 'fill="$1"$2stroke="none"') // Convert stroke-only to fill
-    .replace(/stroke-width="([^"]+)"/g, 'data-stroke-width="$1"'); // Preserve stroke width as data attribute
+  // Get proper color from fill or simplifiedFill (for gradients)
+  const fill = element.simplifiedFill || element.fill || '#000000';
+  const rgbColor = hexToRgb(fill);
   
-  // Extract rectangles
-  const rectRegex = /<rect[^>]*?(?:x=["']([^"']*?)["'])?[^>]*?(?:y=["']([^"']*?)["'])?[^>]*?(?:width=["']([^"']*?)["'])?[^>]*?(?:height=["']([^"']*?)["'])?[^>]*?(?:fill=["']([^"']*?)["'])?[^>]*?(?:opacity=["']([^"']*?)["'])?[^>]*?\/>/g;
-  let rectMatch;
-  while ((rectMatch = rectRegex.exec(fixedSvgString)) !== null) {
-    const fill = rectMatch[5] || '#000000';
-    const opacity = rectMatch[6] !== undefined ? parseFloat(rectMatch[6]) : 1;
-    
-    shapes.push({
-      type: 'rect',
-      x: parseFloat(rectMatch[1] || '0'),
-      y: parseFloat(rectMatch[2] || '0'),
-      width: parseFloat(rectMatch[3] || '10'),
-      height: parseFloat(rectMatch[4] || '10'),
-      fill,
-      opacity
+  if (rgbColor) {
+    page.drawRectangle({
+      x,
+      y,
+      width,
+      height,
+      color: rgb(rgbColor.r / 255, rgbColor.g / 255, rgbColor.b / 255),
+      opacity: element.opacity !== undefined ? element.opacity : 1,
+      borderWidth: 0,
     });
   }
+}
+
+/**
+ * Helper function to draw circles with proper colors and opacity
+ */
+function drawCircle(page: any, element: any, baseX: number, baseY: number, svgHeight: number, scale: number) {
+  const cx = baseX + (element.cx !== undefined ? element.cx * scale : 0);
+  const cy = baseY + (svgHeight - (element.cy !== undefined ? element.cy : 0)) * scale;
+  const r = (element.r !== undefined ? element.r : 5) * scale;
   
-  // Extract circles
-  const circleRegex = /<circle[^>]*?(?:cx=["']([^"']*?)["'])?[^>]*?(?:cy=["']([^"']*?)["'])?[^>]*?(?:r=["']([^"']*?)["'])?[^>]*?(?:fill=["']([^"']*?)["'])?[^>]*?(?:opacity=["']([^"']*?)["'])?[^>]*?\/>/g;
-  let circleMatch;
-  while ((circleMatch = circleRegex.exec(fixedSvgString)) !== null) {
-    const fill = circleMatch[4] || '#000000';
-    const opacity = circleMatch[5] !== undefined ? parseFloat(circleMatch[5]) : 1;
-    
-    shapes.push({
-      type: 'circle',
-      cx: parseFloat(circleMatch[1] || '0'),
-      cy: parseFloat(circleMatch[2] || '0'),
-      r: parseFloat(circleMatch[3] || '5'),
-      fill,
-      opacity
+  const fill = element.simplifiedFill || element.fill || '#000000';
+  const rgbColor = hexToRgb(fill);
+  
+  if (rgbColor) {
+    page.drawCircle({
+      x: cx,
+      y: cy,
+      size: r * 2,
+      color: rgb(rgbColor.r / 255, rgbColor.g / 255, rgbColor.b / 255),
+      opacity: element.opacity !== undefined ? element.opacity : 1,
+      borderWidth: 0,
     });
   }
+}
+
+/**
+ * Helper function to draw ellipses with proper colors and opacity
+ */
+function drawEllipse(page: any, element: any, baseX: number, baseY: number, svgHeight: number, scale: number) {
+  const cx = element.cx !== undefined ? element.cx : 0;
+  const cy = element.cy !== undefined ? element.cy : 0;
+  const rx = element.rx !== undefined ? element.rx : 10;
+  const ry = element.ry !== undefined ? element.ry : 5;
   
-  // Extract paths
-  const pathRegex = /<path[^>]*?(?:d=["']([^"']*?)["'])[^>]*?(?:fill=["']([^"']*?)["'])?[^>]*?(?:opacity=["']([^"']*?)["'])?[^>]*?\/>/g;
-  let pathMatch;
-  while ((pathMatch = pathRegex.exec(fixedSvgString)) !== null) {
-    const fill = pathMatch[2] || '#000000';
-    const opacity = pathMatch[3] !== undefined ? parseFloat(pathMatch[3]) : 1;
-    
-    shapes.push({
-      type: 'path',
-      d: pathMatch[1],
-      fill,
-      opacity
+  // Approximate ellipse with bezier curves
+  const pathData = approximateEllipsePath(cx, cy, rx, ry);
+  
+  const fill = element.simplifiedFill || element.fill || '#000000';
+  const rgbColor = hexToRgb(fill);
+  
+  if (rgbColor) {
+    page.drawSvgPath(pathData, {
+      x: baseX,
+      y: baseY + svgHeight * scale,
+      scale: scale,
+      color: rgb(rgbColor.r / 255, rgbColor.g / 255, rgbColor.b / 255),
+      opacity: element.opacity !== undefined ? element.opacity : 1,
+      borderWidth: 0,
     });
   }
+}
+
+/**
+ * Helper function to approximate an ellipse with a path
+ */
+function approximateEllipsePath(cx: number, cy: number, rx: number, ry: number): string {
+  // Use bezier curves to approximate an ellipse
+  return `M ${cx + rx} ${cy} C ${cx + rx} ${cy + ry * 0.552284}, ${cx + rx * 0.552284} ${cy + ry}, ${cx} ${cy + ry} C ${cx - rx * 0.552284} ${cy + ry}, ${cx - rx} ${cy + ry * 0.552284}, ${cx - rx} ${cy} C ${cx - rx} ${cy - ry * 0.552284}, ${cx - rx * 0.552284} ${cy - ry}, ${cx} ${cy - ry} C ${cx + rx * 0.552284} ${cy - ry}, ${cx + rx} ${cy - ry * 0.552284}, ${cx + rx} ${cy} Z`;
+}
+
+/**
+ * Helper function to draw paths with proper colors and opacity
+ */
+function drawPath(page: any, element: any, baseX: number, baseY: number, svgHeight: number, scale: number) {
+  if (!element.d) return;
   
-  // Extract additional filled shapes (polygons, polylines, etc.)
-  const polygonRegex = /<polygon[^>]*?(?:points=["']([^"']*?)["'])[^>]*?(?:fill=["']([^"']*?)["'])?[^>]*?(?:opacity=["']([^"']*?)["'])?[^>]*?\/>/g;
-  let polygonMatch;
-  while ((polygonMatch = polygonRegex.exec(fixedSvgString)) !== null) {
-    const fill = polygonMatch[2] || '#000000';
-    const opacity = polygonMatch[3] !== undefined ? parseFloat(polygonMatch[3]) : 1;
-    
-    // Convert polygon points to path data
-    const points = polygonMatch[1].trim().split(/[\s,]+/);
-    if (points.length >= 4) { // Need at least 2 points (4 coordinates)
-      let pathData = `M ${points[0]} ${points[1]}`;
-      for (let i = 2; i < points.length; i += 2) {
-        if (i + 1 < points.length) {
-          pathData += ` L ${points[i]} ${points[i+1]}`;
-        }
-      }
-      pathData += ' Z'; // Close the path
-      
-      shapes.push({
-        type: 'path',
-        d: pathData,
-        fill,
-        opacity
-      });
+  const fill = element.simplifiedFill || element.fill || '#000000';
+  const rgbColor = hexToRgb(fill);
+  
+  if (rgbColor) {
+    page.drawSvgPath(element.d, {
+      x: baseX,
+      y: baseY + svgHeight * scale,
+      scale: scale,
+      color: rgb(rgbColor.r / 255, rgbColor.g / 255, rgbColor.b / 255),
+      opacity: element.opacity !== undefined ? element.opacity : 1,
+      borderWidth: 0,
+    });
+  }
+}
+
+/**
+ * Helper function to draw polygons with proper colors and opacity
+ */
+function drawPolygon(page: any, element: any, baseX: number, baseY: number, svgHeight: number, scale: number) {
+  if (!element.points) return;
+  
+  // Convert polygon points to path data
+  const points = element.points.trim().split(/[\s,]+/);
+  if (points.length < 4) return; // Need at least 2 points
+  
+  let pathData = `M ${points[0]} ${points[1]}`;
+  for (let i = 2; i < points.length; i += 2) {
+    if (i + 1 < points.length) {
+      pathData += ` L ${points[i]} ${points[i+1]}`;
     }
   }
+  pathData += ' Z'; // Close the path
   
-  // Extract ellipses and convert to paths
-  const ellipseRegex = /<ellipse[^>]*?(?:cx=["']([^"']*?)["'])?[^>]*?(?:cy=["']([^"']*?)["'])?[^>]*?(?:rx=["']([^"']*?)["'])?[^>]*?(?:ry=["']([^"']*?)["'])?[^>]*?(?:fill=["']([^"']*?)["'])?[^>]*?(?:opacity=["']([^"']*?)["'])?[^>]*?\/>/g;
-  let ellipseMatch;
-  while ((ellipseMatch = ellipseRegex.exec(fixedSvgString)) !== null) {
-    const cx = parseFloat(ellipseMatch[1] || '0');
-    const cy = parseFloat(ellipseMatch[2] || '0');
-    const rx = parseFloat(ellipseMatch[3] || '5');
-    const ry = parseFloat(ellipseMatch[4] || '5');
-    const fill = ellipseMatch[5] || '#000000';
-    const opacity = ellipseMatch[6] !== undefined ? parseFloat(ellipseMatch[6]) : 1;
-    
-    // Approximate ellipse with four bezier curves
-    // This is a simplified approach; for better accuracy, more points could be used
-    const pathData = `M ${cx + rx} ${cy} C ${cx + rx} ${cy + ry * 0.552284}, ${cx + rx * 0.552284} ${cy + ry}, ${cx} ${cy + ry} C ${cx - rx * 0.552284} ${cy + ry}, ${cx - rx} ${cy + ry * 0.552284}, ${cx - rx} ${cy} C ${cx - rx} ${cy - ry * 0.552284}, ${cx - rx * 0.552284} ${cy - ry}, ${cx} ${cy - ry} C ${cx + rx * 0.552284} ${cy - ry}, ${cx + rx} ${cy - ry * 0.552284}, ${cx + rx} ${cy} Z`;
-    
-    shapes.push({
-      type: 'path',
-      d: pathData,
-      fill,
-      opacity
+  const fill = element.simplifiedFill || element.fill || '#000000';
+  const rgbColor = hexToRgb(fill);
+  
+  if (rgbColor) {
+    page.drawSvgPath(pathData, {
+      x: baseX,
+      y: baseY + svgHeight * scale,
+      scale: scale,
+      color: rgb(rgbColor.r / 255, rgbColor.g / 255, rgbColor.b / 255),
+      opacity: element.opacity !== undefined ? element.opacity : 1,
+      borderWidth: 0,
     });
   }
+}
+
+/**
+ * Helper function to extract SVG elements with their styles
+ */
+function extractSvgElementsWithStyles(svgString: string): Array<{type: string, [key: string]: any}> {
+  const elements: Array<{type: string, [key: string]: any}> = [];
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(svgString, 'image/svg+xml');
   
-  // Extract text elements and treat them as paths with fill color
-  const textRegex = /<text[^>]*?(?:x=["']([^"']*?)["'])?[^>]*?(?:y=["']([^"']*?)["'])?[^>]*?(?:fill=["']([^"']*?)["'])?[^>]*?(?:opacity=["']([^"']*?)["'])?[^>]*?>([^<]*)<\/text>/g;
-  let textMatch;
-  while ((textMatch = textRegex.exec(fixedSvgString)) !== null) {
-    const x = parseFloat(textMatch[1] || '0');
-    const y = parseFloat(textMatch[2] || '0');
-    const fill = textMatch[3] || '#000000';
-    const opacity = textMatch[4] !== undefined ? parseFloat(textMatch[4]) : 1;
-    
-    // For text, we'll create a simple rectangle as a placeholder
-    // In a real implementation, text would be rendered properly
-    shapes.push({
+  // Process rectangles
+  const rects = doc.querySelectorAll('rect');
+  rects.forEach(rect => {
+    elements.push({
       type: 'rect',
-      x: x,
-      y: y - 10, // Approximate text height
-      width: 50,  // Approximate text width
-      height: 12, // Approximate text height
-      fill,
-      opacity
+      x: parseFloat(rect.getAttribute('x') || '0'),
+      y: parseFloat(rect.getAttribute('y') || '0'),
+      width: parseFloat(rect.getAttribute('width') || '0'),
+      height: parseFloat(rect.getAttribute('height') || '0'),
+      fill: rect.getAttribute('fill') || '#000000',
+      stroke: rect.getAttribute('stroke'),
+      'stroke-width': rect.getAttribute('stroke-width'),
+      opacity: rect.getAttribute('opacity') ? parseFloat(rect.getAttribute('opacity') || '1') : 1,
+      style: rect.getAttribute('style') || '',
     });
+  });
+  
+  // Process circles
+  const circles = doc.querySelectorAll('circle');
+  circles.forEach(circle => {
+    elements.push({
+      type: 'circle',
+      cx: parseFloat(circle.getAttribute('cx') || '0'),
+      cy: parseFloat(circle.getAttribute('cy') || '0'),
+      r: parseFloat(circle.getAttribute('r') || '0'),
+      fill: circle.getAttribute('fill') || '#000000',
+      stroke: circle.getAttribute('stroke'),
+      'stroke-width': circle.getAttribute('stroke-width'),
+      opacity: circle.getAttribute('opacity') ? parseFloat(circle.getAttribute('opacity') || '1') : 1,
+      style: circle.getAttribute('style') || '',
+    });
+  });
+  
+  // Process ellipses
+  const ellipses = doc.querySelectorAll('ellipse');
+  ellipses.forEach(ellipse => {
+    elements.push({
+      type: 'ellipse',
+      cx: parseFloat(ellipse.getAttribute('cx') || '0'),
+      cy: parseFloat(ellipse.getAttribute('cy') || '0'),
+      rx: parseFloat(ellipse.getAttribute('rx') || '0'),
+      ry: parseFloat(ellipse.getAttribute('ry') || '0'),
+      fill: ellipse.getAttribute('fill') || '#000000',
+      stroke: ellipse.getAttribute('stroke'),
+      'stroke-width': ellipse.getAttribute('stroke-width'),
+      opacity: ellipse.getAttribute('opacity') ? parseFloat(ellipse.getAttribute('opacity') || '1') : 1,
+      style: ellipse.getAttribute('style') || '',
+    });
+  });
+  
+  // Process paths
+  const paths = doc.querySelectorAll('path');
+  paths.forEach(path => {
+    elements.push({
+      type: 'path',
+      d: path.getAttribute('d') || '',
+      fill: path.getAttribute('fill') || '#000000',
+      stroke: path.getAttribute('stroke'),
+      'stroke-width': path.getAttribute('stroke-width'),
+      opacity: path.getAttribute('opacity') ? parseFloat(path.getAttribute('opacity') || '1') : 1,
+      style: path.getAttribute('style') || '',
+    });
+  });
+  
+  // Process polygons
+  const polygons = doc.querySelectorAll('polygon');
+  polygons.forEach(polygon => {
+    elements.push({
+      type: 'polygon',
+      points: polygon.getAttribute('points') || '',
+      fill: polygon.getAttribute('fill') || '#000000',
+      stroke: polygon.getAttribute('stroke'),
+      'stroke-width': polygon.getAttribute('stroke-width'),
+      opacity: polygon.getAttribute('opacity') ? parseFloat(polygon.getAttribute('opacity') || '1') : 1,
+      style: polygon.getAttribute('style') || '',
+    });
+  });
+  
+  // Process polylines
+  const polylines = doc.querySelectorAll('polyline');
+  polylines.forEach(polyline => {
+    elements.push({
+      type: 'polyline',
+      points: polyline.getAttribute('points') || '',
+      fill: polyline.getAttribute('fill') || 'none',
+      stroke: polyline.getAttribute('stroke') || '#000000',
+      'stroke-width': polyline.getAttribute('stroke-width'),
+      opacity: polyline.getAttribute('opacity') ? parseFloat(polyline.getAttribute('opacity') || '1') : 1,
+      style: polyline.getAttribute('style') || '',
+    });
+  });
+  
+  return elements;
+}
+
+/**
+ * Helper function to extract gradients from SVG
+ */
+function extractGradients(svgString: string): Array<{id: string, type: string, stops: Array<{offset: string, color: string, opacity: number}>}> {
+  const gradients: Array<{id: string, type: string, stops: Array<{offset: string, color: string, opacity: number}>}> = [];
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(svgString, 'image/svg+xml');
+  
+  // Process linear gradients
+  const linearGradients = doc.querySelectorAll('linearGradient');
+  linearGradients.forEach(gradient => {
+    const id = gradient.getAttribute('id') || '';
+    const stops: Array<{offset: string, color: string, opacity: number}> = [];
+    
+    // Extract stops
+    gradient.querySelectorAll('stop').forEach(stop => {
+      stops.push({
+        offset: stop.getAttribute('offset') || '0%',
+        color: stop.getAttribute('stop-color') || '#000000',
+        opacity: parseFloat(stop.getAttribute('stop-opacity') || '1')
+      });
+    });
+    
+    gradients.push({
+      id,
+      type: 'linear',
+      stops
+    });
+  });
+  
+  // Process radial gradients
+  const radialGradients = doc.querySelectorAll('radialGradient');
+  radialGradients.forEach(gradient => {
+    const id = gradient.getAttribute('id') || '';
+    const stops: Array<{offset: string, color: string, opacity: number}> = [];
+    
+    // Extract stops
+    gradient.querySelectorAll('stop').forEach(stop => {
+      stops.push({
+        offset: stop.getAttribute('offset') || '0%',
+        color: stop.getAttribute('stop-color') || '#000000',
+        opacity: parseFloat(stop.getAttribute('stop-opacity') || '1')
+      });
+    });
+    
+    gradients.push({
+      id,
+      type: 'radial',
+      stops
+    });
+  });
+  
+  return gradients;
+}
+
+/**
+ * Helper function to approximate a gradient with a solid color
+ * This is a simplified approach - for better results, actual PDF gradients should be used
+ */
+function approximateGradientColor(gradient: {id: string, type: string, stops: Array<{offset: string, color: string, opacity: number}>}): string {
+  if (gradient.stops.length === 0) return '#000000';
+  
+  if (gradient.stops.length === 1) {
+    return gradient.stops[0].color;
   }
   
-  console.log(`Extracted ${shapes.length} shapes from SVG`);
-  return shapes;
+  // For simplicity, we use the middle color or average the first and last stops
+  if (gradient.stops.length === 2) {
+    const startColor = hexToRgb(gradient.stops[0].color) || { r: 0, g: 0, b: 0 };
+    const endColor = hexToRgb(gradient.stops[1].color) || { r: 0, g: 0, b: 0 };
+    
+    const avgR = Math.round((startColor.r + endColor.r) / 2);
+    const avgG = Math.round((startColor.g + endColor.g) / 2);
+    const avgB = Math.round((startColor.b + endColor.b) / 2);
+    
+    return `#${avgR.toString(16).padStart(2, '0')}${avgG.toString(16).padStart(2, '0')}${avgB.toString(16).padStart(2, '0')}`;
+  }
+  
+  // If more than 2 stops, use the middle stop
+  const middleIndex = Math.floor(gradient.stops.length / 2);
+  return gradient.stops[middleIndex].color;
 }
 
 /**
@@ -244,8 +432,10 @@ function extractSimplePaths(svgString: string): Array<{type: string, [key: strin
  */
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   // Handle named colors
+  if (!hex) return { r: 0, g: 0, b: 0 };
   if (hex.toLowerCase() === 'black' || hex === '#000000') return { r: 0, g: 0, b: 0 };
   if (hex.toLowerCase() === 'white' || hex === '#ffffff') return { r: 255, g: 255, b: 255 };
+  if (hex.toLowerCase() === 'none' || hex === 'transparent') return null;
   
   // Handle RGB/RGBA format
   const rgbMatch = hex.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
@@ -270,5 +460,5 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
     r: parseInt(result[1], 16),
     g: parseInt(result[2], 16),
     b: parseInt(result[3], 16)
-  } : null;
+  } : { r: 0, g: 0, b: 0 }; // Default to black if parsing fails
 }
