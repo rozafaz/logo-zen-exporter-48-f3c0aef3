@@ -56,6 +56,9 @@ export const applyColorToSvg = (
     modifiedSvg = modifySvgColor(modifiedSvg, '#808080');
   } else if (color === 'Inverted' && colors.includes('Inverted')) {
     modifiedSvg = invertSvgColors(modifiedSvg);
+  } else if (color === 'original') {
+    // Keep original colors
+    modifiedSvg = svgText;
   }
   
   return modifiedSvg;

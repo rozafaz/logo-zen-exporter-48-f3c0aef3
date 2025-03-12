@@ -1,3 +1,4 @@
+
 import { createPdfFromSvg, createPdfFromImage } from './pdf';
 import { applyColorToSvg, createSimpleSvgFromRaster, getSvgDimensions } from './svgUtils';
 import { applyColorFilter } from './rasterUtils';
@@ -21,10 +22,10 @@ export const processPdfFromSvg = async (
     let modifiedSvg = svgText;
     
     // For specific color variations, apply special color handling
-    if (color === 'black') {
+    if (color === 'Black') {
       // Convert all elements to black
       modifiedSvg = applyColorToSvg(svgText, '#000000', colors);
-    } else if (color === 'white') {
+    } else if (color === 'White') {
       // Convert all elements to white
       modifiedSvg = applyColorToSvg(svgText, '#FFFFFF', colors);
     } else if (color === 'original') {

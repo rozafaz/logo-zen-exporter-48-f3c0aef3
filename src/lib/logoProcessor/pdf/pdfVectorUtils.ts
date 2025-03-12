@@ -163,6 +163,78 @@ function extractSimplePaths(svgString: string): Array<{type: string, [key: strin
     });
   }
   
+  // Extract additional filled shapes (polygons, polylines, etc.)
+  const polygonRegex = /<polygon[^>]*?(?:points=["']([^"']*?)["'])[^>]*?(?:fill=["']([^"']*?)["'])?[^>]*?(?:opacity=["']([^"']*?)["'])?[^>]*?\/>/g;
+  let polygonMatch;
+  while ((polygonMatch = polygonRegex.exec(fixedSvgString)) !== null) {
+    const fill = polygonMatch[2] || '#000000';
+    const opacity = polygonMatch[3] !== undefined ? parseFloat(polygonMatch[3]) : 1;
+    
+    // Convert polygon points to path data
+    const points = polygonMatch[1].trim().split(/[\s,]+/);
+    if (points.length >= 4) { // Need at least 2 points (4 coordinates)
+      let pathData = `M ${points[0]} ${points[1]}`;
+      for (let i = 2; i < points.length; i += 2) {
+        if (i + 1 < points.length) {
+          pathData += ` L ${points[i]} ${points[i+1]}`;
+        }
+      }
+      pathData += ' Z'; // Close the path
+      
+      shapes.push({
+        type: 'path',
+        d: pathData,
+        fill,
+        opacity
+      });
+    }
+  }
+  
+  // Extract ellipses and convert to paths
+  const ellipseRegex = /<ellipse[^>]*?(?:cx=["']([^"']*?)["'])?[^>]*?(?:cy=["']([^"']*?)["'])?[^>]*?(?:rx=["']([^"']*?)["'])?[^>]*?(?:ry=["']([^"']*?)["'])?[^>]*?(?:fill=["']([^"']*?)["'])?[^>]*?(?:opacity=["']([^"']*?)["'])?[^>]*?\/>/g;
+  let ellipseMatch;
+  while ((ellipseMatch = ellipseRegex.exec(fixedSvgString)) !== null) {
+    const cx = parseFloat(ellipseMatch[1] || '0');
+    const cy = parseFloat(ellipseMatch[2] || '0');
+    const rx = parseFloat(ellipseMatch[3] || '5');
+    const ry = parseFloat(ellipseMatch[4] || '5');
+    const fill = ellipseMatch[5] || '#000000';
+    const opacity = ellipseMatch[6] !== undefined ? parseFloat(ellipseMatch[6]) : 1;
+    
+    // Approximate ellipse with four bezier curves
+    // This is a simplified approach; for better accuracy, more points could be used
+    const pathData = `M ${cx + rx} ${cy} C ${cx + rx} ${cy + ry * 0.552284}, ${cx + rx * 0.552284} ${cy + ry}, ${cx} ${cy + ry} C ${cx - rx * 0.552284} ${cy + ry}, ${cx - rx} ${cy + ry * 0.552284}, ${cx - rx} ${cy} C ${cx - rx} ${cy - ry * 0.552284}, ${cx - rx * 0.552284} ${cy - ry}, ${cx} ${cy - ry} C ${cx + rx * 0.552284} ${cy - ry}, ${cx + rx} ${cy - ry * 0.552284}, ${cx + rx} ${cy} Z`;
+    
+    shapes.push({
+      type: 'path',
+      d: pathData,
+      fill,
+      opacity
+    });
+  }
+  
+  // Extract text elements and treat them as paths with fill color
+  const textRegex = /<text[^>]*?(?:x=["']([^"']*?)["'])?[^>]*?(?:y=["']([^"']*?)["'])?[^>]*?(?:fill=["']([^"']*?)["'])?[^>]*?(?:opacity=["']([^"']*?)["'])?[^>]*?>([^<]*)<\/text>/g;
+  let textMatch;
+  while ((textMatch = textRegex.exec(fixedSvgString)) !== null) {
+    const x = parseFloat(textMatch[1] || '0');
+    const y = parseFloat(textMatch[2] || '0');
+    const fill = textMatch[3] || '#000000';
+    const opacity = textMatch[4] !== undefined ? parseFloat(textMatch[4]) : 1;
+    
+    // For text, we'll create a simple rectangle as a placeholder
+    // In a real implementation, text would be rendered properly
+    shapes.push({
+      type: 'rect',
+      x: x,
+      y: y - 10, // Approximate text height
+      width: 50,  // Approximate text width
+      height: 12, // Approximate text height
+      fill,
+      opacity
+    });
+  }
+  
   console.log(`Extracted ${shapes.length} shapes from SVG`);
   return shapes;
 }
@@ -174,6 +246,16 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   // Handle named colors
   if (hex.toLowerCase() === 'black' || hex === '#000000') return { r: 0, g: 0, b: 0 };
   if (hex.toLowerCase() === 'white' || hex === '#ffffff') return { r: 255, g: 255, b: 255 };
+  
+  // Handle RGB/RGBA format
+  const rgbMatch = hex.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+  if (rgbMatch) {
+    return {
+      r: parseInt(rgbMatch[1]),
+      g: parseInt(rgbMatch[2]),
+      b: parseInt(rgbMatch[3])
+    };
+  }
   
   // Handle shorthand hex (#abc -> #aabbcc)
   let normalizedHex = hex.startsWith('#') ? hex : '#' + hex;
