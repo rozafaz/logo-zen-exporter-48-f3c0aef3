@@ -18,7 +18,7 @@ export const processPdfFromSvg = async (
   try {
     console.log('Generating vector PDF from SVG for', color);
     
-    // Apply color modifications if needed
+    // Apply color modifications if needed - using the same color function as SVG exports
     let modifiedSvg = applyColorToSvg(svgText, color, colors);
     
     // Extract dimensions for better positioning
@@ -69,7 +69,7 @@ export const processPdfFromRaster = async (
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(originalLogo, 0, 0, canvas.width, canvas.height);
     
-    // Apply color variations
+    // Apply color variations - using the same filters used for raster exports
     applyColorFilter(ctx, canvas.width, canvas.height, color, colors);
     
     // Convert canvas to PNG for embedding in PDF

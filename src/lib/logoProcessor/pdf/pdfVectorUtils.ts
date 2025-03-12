@@ -50,15 +50,20 @@ export const createPdfFromSvg = async (svgString: string): Promise<Blob> => {
     // Add vector content to page
     const paths = extractSimplePaths(svgString);
     
-    // Draw the paths with proper fill and positioning
+    // Draw the paths with their fill colors and proper positioning
     paths.forEach((pathData) => {
+      // Convert the fill color to RGB values for pdf-lib
+      const fillColor = pathData.fill || '#000000';
+      const rgbColor = hexToRgb(fillColor);
+      const pdfColor = rgbColor ? rgb(rgbColor.r / 255, rgbColor.g / 255, rgbColor.b / 255) : rgb(0, 0, 0);
+      
       if (pathData.type === 'rect') {
         page.drawRectangle({
           x: x + (pathData.x || 0) * scale,
           y: y + ((height - (pathData.y || 0) - (pathData.height || 0))) * scale,
           width: (pathData.width || 10) * scale,
           height: (pathData.height || 10) * scale,
-          color: rgb(0, 0, 0),
+          color: pdfColor,
           opacity: pathData.opacity || 1,
           borderWidth: 0,
         });
@@ -67,7 +72,7 @@ export const createPdfFromSvg = async (svgString: string): Promise<Blob> => {
           x: x + (pathData.cx || width/2) * scale,
           y: y + ((height - (pathData.cy || height/2))) * scale,
           size: (pathData.r || 10) * scale * 2,
-          color: rgb(0, 0, 0),
+          color: pdfColor,
           borderWidth: 0,
           opacity: pathData.opacity || 1,
         });
@@ -76,7 +81,7 @@ export const createPdfFromSvg = async (svgString: string): Promise<Blob> => {
           x: x,
           y: y + height * scale,
           scale: scale,
-          color: rgb(0, 0, 0),
+          color: pdfColor,
           borderWidth: 0,
           opacity: pathData.opacity || 1,
         });
@@ -160,4 +165,28 @@ function extractSimplePaths(svgString: string): Array<{type: string, [key: strin
   
   console.log(`Extracted ${shapes.length} shapes from SVG`);
   return shapes;
+}
+
+/**
+ * Helper function to convert hex color to RGB values
+ */
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  // Handle named colors
+  if (hex.toLowerCase() === 'black' || hex === '#000000') return { r: 0, g: 0, b: 0 };
+  if (hex.toLowerCase() === 'white' || hex === '#ffffff') return { r: 255, g: 255, b: 255 };
+  
+  // Handle shorthand hex (#abc -> #aabbcc)
+  let normalizedHex = hex.startsWith('#') ? hex : '#' + hex;
+  if (normalizedHex.length === 4) {
+    normalizedHex = '#' + normalizedHex[1] + normalizedHex[1] + 
+                          normalizedHex[2] + normalizedHex[2] + 
+                          normalizedHex[3] + normalizedHex[3];
+  }
+  
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(normalizedHex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : null;
 }
