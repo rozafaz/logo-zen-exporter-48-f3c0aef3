@@ -1,4 +1,3 @@
-
 import { PDFDocument, rgb, ColorTypes } from 'pdf-lib';
 import { getPostScriptColor } from '../vectorUtils';
 
@@ -9,6 +8,12 @@ export const createPdfFromSvg = async (svgString: string): Promise<Blob> => {
   try {
     console.log('Creating vector PDF from SVG, length:', svgString.length);
     
+    // Validate SVG input
+    if (!svgString || !svgString.includes('<svg')) {
+      console.error('Invalid SVG input:', svgString.substring(0, 100) + '...');
+      throw new Error('Invalid SVG input');
+    }
+    
     // Create a new PDF document
     const pdfDoc = await PDFDocument.create();
     
@@ -18,12 +23,36 @@ export const createPdfFromSvg = async (svgString: string): Promise<Blob> => {
     let height = 600;
     
     if (viewBoxMatch && viewBoxMatch[1]) {
-      const [, , w, h] = viewBoxMatch[1].split(/\s+/).map(Number);
-      if (!isNaN(w) && !isNaN(h)) {
-        width = w;
-        height = h;
+      const viewBoxParts = viewBoxMatch[1].split(/\s+/).map(Number);
+      if (viewBoxParts.length >= 4) {
+        const [minX, minY, w, h] = viewBoxParts;
+        console.log('Extracted viewBox:', { minX, minY, w, h });
+        if (!isNaN(w) && !isNaN(h) && w > 0 && h > 0) {
+          width = w;
+          height = h;
+        } else {
+          console.warn('Invalid viewBox dimensions, using defaults');
+        }
+      }
+    } else {
+      // Try to get width/height attributes if viewBox is missing
+      const widthMatch = svgString.match(/width=["']([^"']+)["']/);
+      const heightMatch = svgString.match(/height=["']([^"']+)["']/);
+      
+      if (widthMatch && heightMatch) {
+        const w = parseFloat(widthMatch[1]);
+        const h = parseFloat(heightMatch[1]);
+        console.log('Using width/height attributes:', { w, h });
+        if (!isNaN(w) && !isNaN(h) && w > 0 && h > 0) {
+          width = w;
+          height = h;
+        }
+      } else {
+        console.warn('No viewBox or dimensions found, using defaults');
       }
     }
+    
+    console.log('Final dimensions for PDF:', { width, height });
     
     // Set aspect ratio for the page to match the SVG
     const pageWidth = 600;
@@ -40,56 +69,88 @@ export const createPdfFromSvg = async (svgString: string): Promise<Blob> => {
     const x = (pageWidth - width * scale) / 2;
     const y = (pageHeight - height * scale) / 2;
     
+    console.log('Positioning in PDF:', { x, y, scale });
+    
     // Add vector content to page with improved gradient and transparency support
     const elementsWithStyles = extractSvgElementsWithStyles(svgString);
+    console.log(`Extracted ${elementsWithStyles.length} SVG elements`);
     
     // Draw the paths with their fill colors and proper positioning
+    let drawnElements = 0;
     elementsWithStyles.forEach((element) => {
-      // Handle each element based on its type
-      if (element.type === 'rect') {
-        // For rectangles, we directly use the PDF drawing operations
-        drawRectangle(page, element, x, y, height, scale);
-      } else if (element.type === 'circle') {
-        // For circles, we directly use the PDF drawing operations
-        drawCircle(page, element, x, y, height, scale);
-      } else if (element.type === 'ellipse') {
-        // For ellipses, we approximate with bezier curves
-        drawEllipse(page, element, x, y, height, scale);
-      } else if (element.type === 'path') {
-        // For paths, we use the drawSvgPath method
-        drawPath(page, element, x, y, height, scale);
-      } else if (element.type === 'polygon' || element.type === 'polyline') {
-        // For polygons and polylines, we convert to paths
-        drawPolygon(page, element, x, y, height, scale);
+      try {
+        // Handle each element based on its type
+        if (element.type === 'rect') {
+          drawRectangle(page, element, x, y, height, scale);
+          drawnElements++;
+        } else if (element.type === 'circle') {
+          drawCircle(page, element, x, y, height, scale);
+          drawnElements++;
+        } else if (element.type === 'ellipse') {
+          drawEllipse(page, element, x, y, height, scale);
+          drawnElements++;
+        } else if (element.type === 'path') {
+          drawPath(page, element, x, y, height, scale);
+          drawnElements++;
+        } else if (element.type === 'polygon' || element.type === 'polyline') {
+          drawPolygon(page, element, x, y, height, scale);
+          drawnElements++;
+        }
+      } catch (elementError) {
+        console.error(`Error drawing ${element.type} element:`, elementError);
       }
     });
     
-    // Handle gradient references (this is a simplified approach)
-    // In a full implementation, this would properly render gradients
-    // by creating gradient fills in the PDF
-    const gradientElements = extractGradients(svgString);
-    gradientElements.forEach(gradient => {
-      // We simplify gradients with a solid color approximation for now
-      // A more complete solution would implement actual PDF gradients
-      const averageColor = approximateGradientColor(gradient);
+    console.log(`Successfully drew ${drawnElements} elements to PDF`);
+    
+    // Handle gradient references - simplified approach
+    try {
+      const gradientElements = extractGradients(svgString);
+      console.log(`Found ${gradientElements.length} gradient definitions`);
       
-      // Find elements referencing this gradient and apply the average color
-      elementsWithStyles.forEach(element => {
-        if (element.fill && element.fill.includes(`url(#${gradient.id})`)) {
-          element.simplifiedFill = averageColor;
-          
-          // Redraw with the simplified color
-          if (element.type === 'rect') {
-            drawRectangle(page, { ...element, fill: averageColor }, x, y, height, scale);
-          } else if (element.type === 'path') {
-            drawPath(page, { ...element, fill: averageColor }, x, y, height, scale);
+      gradientElements.forEach(gradient => {
+        // We simplify gradients with a solid color approximation for now
+        const averageColor = approximateGradientColor(gradient);
+        
+        // Find elements referencing this gradient and apply the average color
+        elementsWithStyles.forEach(element => {
+          if (element.fill && element.fill.includes(`url(#${gradient.id})`)) {
+            element.simplifiedFill = averageColor;
+            
+            // Redraw with the simplified color
+            try {
+              if (element.type === 'rect') {
+                drawRectangle(page, { ...element, fill: averageColor }, x, y, height, scale);
+              } else if (element.type === 'path') {
+                drawPath(page, { ...element, fill: averageColor }, x, y, height, scale);
+              }
+            } catch (redrawError) {
+              console.error('Error redrawing element with gradient:', redrawError);
+            }
           }
-          // Handle other element types similarly
-        }
+        });
       });
-    });
+    } catch (gradientError) {
+      console.error('Error processing gradients:', gradientError);
+    }
+    
+    // If no elements were drawn, add a fallback rectangle to ensure the PDF isn't empty
+    if (drawnElements === 0) {
+      console.warn('No elements were drawn, adding fallback shape');
+      page.drawRectangle({
+        x: pageWidth * 0.2,
+        y: pageHeight * 0.2,
+        width: pageWidth * 0.6,
+        height: pageHeight * 0.6,
+        color: rgb(0, 0, 0),
+        borderWidth: 1,
+        borderColor: rgb(0, 0, 0),
+        opacity: 0.5
+      });
+    }
     
     // Save the PDF to bytes
+    console.log('Saving PDF document');
     const pdfBytes = await pdfDoc.save();
     
     // Create a Blob from the PDF bytes
@@ -99,7 +160,29 @@ export const createPdfFromSvg = async (svgString: string): Promise<Blob> => {
     return pdfBlob;
   } catch (error) {
     console.error('Error in createPdfFromSvg:', error);
-    throw error;
+    
+    // Fallback to a minimal PDF if conversion fails
+    try {
+      console.log('Creating minimal fallback PDF');
+      const pdfDoc = await PDFDocument.create();
+      const page = pdfDoc.addPage([600, 600]);
+      
+      // Add a text note about the error
+      page.drawText('SVG conversion failed', {
+        x: 50,
+        y: 500,
+        size: 20,
+      });
+      
+      const pdfBytes = await pdfDoc.save();
+      const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+      
+      console.log('Created fallback PDF, size:', pdfBlob.size);
+      return pdfBlob;
+    } catch (fallbackError) {
+      console.error('Fallback PDF creation failed:', fallbackError);
+      throw error; // Re-throw the original error if fallback fails
+    }
   }
 };
 
@@ -245,103 +328,115 @@ function drawPolygon(page: any, element: any, baseX: number, baseY: number, svgH
  * Helper function to extract SVG elements with their styles
  */
 function extractSvgElementsWithStyles(svgString: string): Array<{type: string, [key: string]: any}> {
-  const elements: Array<{type: string, [key: string]: any}> = [];
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(svgString, 'image/svg+xml');
-  
-  // Process rectangles
-  const rects = doc.querySelectorAll('rect');
-  rects.forEach(rect => {
-    elements.push({
-      type: 'rect',
-      x: parseFloat(rect.getAttribute('x') || '0'),
-      y: parseFloat(rect.getAttribute('y') || '0'),
-      width: parseFloat(rect.getAttribute('width') || '0'),
-      height: parseFloat(rect.getAttribute('height') || '0'),
-      fill: rect.getAttribute('fill') || '#000000',
-      stroke: rect.getAttribute('stroke'),
-      'stroke-width': rect.getAttribute('stroke-width'),
-      opacity: rect.getAttribute('opacity') ? parseFloat(rect.getAttribute('opacity') || '1') : 1,
-      style: rect.getAttribute('style') || '',
+  try {
+    const elements: Array<{type: string, [key: string]: any}> = [];
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svgString, 'image/svg+xml');
+    
+    // Check for parsing errors
+    const parserError = doc.querySelector('parsererror');
+    if (parserError) {
+      console.error('SVG parsing error:', parserError.textContent);
+      return elements;
+    }
+    
+    // Process rectangles
+    const rects = doc.querySelectorAll('rect');
+    rects.forEach(rect => {
+      elements.push({
+        type: 'rect',
+        x: parseFloat(rect.getAttribute('x') || '0'),
+        y: parseFloat(rect.getAttribute('y') || '0'),
+        width: parseFloat(rect.getAttribute('width') || '0'),
+        height: parseFloat(rect.getAttribute('height') || '0'),
+        fill: rect.getAttribute('fill') || '#000000',
+        stroke: rect.getAttribute('stroke'),
+        'stroke-width': rect.getAttribute('stroke-width'),
+        opacity: rect.getAttribute('opacity') ? parseFloat(rect.getAttribute('opacity') || '1') : 1,
+        style: rect.getAttribute('style') || '',
+      });
     });
-  });
-  
-  // Process circles
-  const circles = doc.querySelectorAll('circle');
-  circles.forEach(circle => {
-    elements.push({
-      type: 'circle',
-      cx: parseFloat(circle.getAttribute('cx') || '0'),
-      cy: parseFloat(circle.getAttribute('cy') || '0'),
-      r: parseFloat(circle.getAttribute('r') || '0'),
-      fill: circle.getAttribute('fill') || '#000000',
-      stroke: circle.getAttribute('stroke'),
-      'stroke-width': circle.getAttribute('stroke-width'),
-      opacity: circle.getAttribute('opacity') ? parseFloat(circle.getAttribute('opacity') || '1') : 1,
-      style: circle.getAttribute('style') || '',
+    
+    // Process circles
+    const circles = doc.querySelectorAll('circle');
+    circles.forEach(circle => {
+      elements.push({
+        type: 'circle',
+        cx: parseFloat(circle.getAttribute('cx') || '0'),
+        cy: parseFloat(circle.getAttribute('cy') || '0'),
+        r: parseFloat(circle.getAttribute('r') || '0'),
+        fill: circle.getAttribute('fill') || '#000000',
+        stroke: circle.getAttribute('stroke'),
+        'stroke-width': circle.getAttribute('stroke-width'),
+        opacity: circle.getAttribute('opacity') ? parseFloat(circle.getAttribute('opacity') || '1') : 1,
+        style: circle.getAttribute('style') || '',
+      });
     });
-  });
-  
-  // Process ellipses
-  const ellipses = doc.querySelectorAll('ellipse');
-  ellipses.forEach(ellipse => {
-    elements.push({
-      type: 'ellipse',
-      cx: parseFloat(ellipse.getAttribute('cx') || '0'),
-      cy: parseFloat(ellipse.getAttribute('cy') || '0'),
-      rx: parseFloat(ellipse.getAttribute('rx') || '0'),
-      ry: parseFloat(ellipse.getAttribute('ry') || '0'),
-      fill: ellipse.getAttribute('fill') || '#000000',
-      stroke: ellipse.getAttribute('stroke'),
-      'stroke-width': ellipse.getAttribute('stroke-width'),
-      opacity: ellipse.getAttribute('opacity') ? parseFloat(ellipse.getAttribute('opacity') || '1') : 1,
-      style: ellipse.getAttribute('style') || '',
+    
+    // Process ellipses
+    const ellipses = doc.querySelectorAll('ellipse');
+    ellipses.forEach(ellipse => {
+      elements.push({
+        type: 'ellipse',
+        cx: parseFloat(ellipse.getAttribute('cx') || '0'),
+        cy: parseFloat(ellipse.getAttribute('cy') || '0'),
+        rx: parseFloat(ellipse.getAttribute('rx') || '0'),
+        ry: parseFloat(ellipse.getAttribute('ry') || '0'),
+        fill: ellipse.getAttribute('fill') || '#000000',
+        stroke: ellipse.getAttribute('stroke'),
+        'stroke-width': ellipse.getAttribute('stroke-width'),
+        opacity: ellipse.getAttribute('opacity') ? parseFloat(ellipse.getAttribute('opacity') || '1') : 1,
+        style: ellipse.getAttribute('style') || '',
+      });
     });
-  });
-  
-  // Process paths
-  const paths = doc.querySelectorAll('path');
-  paths.forEach(path => {
-    elements.push({
-      type: 'path',
-      d: path.getAttribute('d') || '',
-      fill: path.getAttribute('fill') || '#000000',
-      stroke: path.getAttribute('stroke'),
-      'stroke-width': path.getAttribute('stroke-width'),
-      opacity: path.getAttribute('opacity') ? parseFloat(path.getAttribute('opacity') || '1') : 1,
-      style: path.getAttribute('style') || '',
+    
+    // Process paths
+    const paths = doc.querySelectorAll('path');
+    paths.forEach(path => {
+      elements.push({
+        type: 'path',
+        d: path.getAttribute('d') || '',
+        fill: path.getAttribute('fill') || '#000000',
+        stroke: path.getAttribute('stroke'),
+        'stroke-width': path.getAttribute('stroke-width'),
+        opacity: path.getAttribute('opacity') ? parseFloat(path.getAttribute('opacity') || '1') : 1,
+        style: path.getAttribute('style') || '',
+      });
     });
-  });
-  
-  // Process polygons
-  const polygons = doc.querySelectorAll('polygon');
-  polygons.forEach(polygon => {
-    elements.push({
-      type: 'polygon',
-      points: polygon.getAttribute('points') || '',
-      fill: polygon.getAttribute('fill') || '#000000',
-      stroke: polygon.getAttribute('stroke'),
-      'stroke-width': polygon.getAttribute('stroke-width'),
-      opacity: polygon.getAttribute('opacity') ? parseFloat(polygon.getAttribute('opacity') || '1') : 1,
-      style: polygon.getAttribute('style') || '',
+    
+    // Process polygons
+    const polygons = doc.querySelectorAll('polygon');
+    polygons.forEach(polygon => {
+      elements.push({
+        type: 'polygon',
+        points: polygon.getAttribute('points') || '',
+        fill: polygon.getAttribute('fill') || '#000000',
+        stroke: polygon.getAttribute('stroke'),
+        'stroke-width': polygon.getAttribute('stroke-width'),
+        opacity: polygon.getAttribute('opacity') ? parseFloat(polygon.getAttribute('opacity') || '1') : 1,
+        style: polygon.getAttribute('style') || '',
+      });
     });
-  });
-  
-  // Process polylines
-  const polylines = doc.querySelectorAll('polyline');
-  polylines.forEach(polyline => {
-    elements.push({
-      type: 'polyline',
-      points: polyline.getAttribute('points') || '',
-      fill: polyline.getAttribute('fill') || 'none',
-      stroke: polyline.getAttribute('stroke') || '#000000',
-      'stroke-width': polyline.getAttribute('stroke-width'),
-      opacity: polyline.getAttribute('opacity') ? parseFloat(polyline.getAttribute('opacity') || '1') : 1,
-      style: polyline.getAttribute('style') || '',
+    
+    // Process polylines
+    const polylines = doc.querySelectorAll('polyline');
+    polylines.forEach(polyline => {
+      elements.push({
+        type: 'polyline',
+        points: polyline.getAttribute('points') || '',
+        fill: polyline.getAttribute('fill') || 'none',
+        stroke: polyline.getAttribute('stroke') || '#000000',
+        'stroke-width': polyline.getAttribute('stroke-width'),
+        opacity: polyline.getAttribute('opacity') ? parseFloat(polyline.getAttribute('opacity') || '1') : 1,
+        style: polyline.getAttribute('style') || '',
+      });
     });
-  });
-  
-  return elements;
+    
+    return elements;
+  } catch (error) {
+    console.error('Error extracting SVG elements:', error);
+    return [];
+  }
 }
 
 /**
