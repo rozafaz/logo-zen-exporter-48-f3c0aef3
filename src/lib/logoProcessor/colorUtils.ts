@@ -54,58 +54,102 @@ export const applyInvertedFilter = (ctx: CanvasRenderingContext2D, width: number
 // Improved function to modify the color of an SVG
 export const modifySvgColor = (svgString: string, newColor: string): string => {
   try {
+    console.log(`Modifying SVG colors to: ${newColor}`);
     const parser = new DOMParser();
     const serializer = new XMLSerializer();
     const svgDoc = parser.parseFromString(svgString, 'image/svg+xml');
     
+    // Check for parsing errors
+    const parserError = svgDoc.querySelector('parsererror');
+    if (parserError) {
+      console.error('SVG parsing error:', parserError.textContent);
+      // Use basic string replacement as fallback
+      console.log('Using fallback string replacement for color modification');
+      let modifiedSvg = svgString.replace(/fill="[^"]*"/g, `fill="${newColor}"`);
+      modifiedSvg = modifiedSvg.replace(/stroke="[^"]*"/g, `stroke="${newColor}"`);
+      return modifiedSvg;
+    }
+    
+    // Count elements before modification
+    const beforeCount = svgDoc.querySelectorAll('*').length;
+    console.log(`SVG contains ${beforeCount} elements before color modification`);
+    
     // Function to override fill and stroke for an element
     function overrideElementColor(el: Element) {
+      // Skip SVG root element
+      if (el.tagName === 'svg') return;
+      
       // Remove inline styles that may conflict
-      el.removeAttribute('style');
+      if (el.hasAttribute('style')) {
+        el.removeAttribute('style');
+      }
       
       // Set fill and stroke attributes
-      if (el.tagName !== 'svg') { // Don't override the root svg element's fill
+      if (el.hasAttribute('fill') && el.getAttribute('fill') !== 'none') {
         el.setAttribute('fill', newColor);
-        if (el.hasAttribute('stroke') && el.getAttribute('stroke') !== 'none') {
-          el.setAttribute('stroke', newColor);
+        console.log(`Set fill="${newColor}" on ${el.tagName} element`);
+      } else if (!el.hasAttribute('fill')) {
+        // Add fill if missing (for most elements except certain ones)
+        if (!['clipPath', 'defs', 'g', 'marker', 'mask', 'pattern', 'symbol', 'use'].includes(el.tagName)) {
+          el.setAttribute('fill', newColor);
+          console.log(`Added fill="${newColor}" to ${el.tagName} element`);
         }
       }
       
-      // Remove any fill-opacity or stroke-opacity
+      if (el.hasAttribute('stroke') && el.getAttribute('stroke') !== 'none') {
+        el.setAttribute('stroke', newColor);
+        console.log(`Set stroke="${newColor}" on ${el.tagName} element`);
+      }
+      
+      // Remove any fill-opacity or stroke-opacity that might interfere
       el.removeAttribute('fill-opacity');
       el.removeAttribute('stroke-opacity');
     }
     
     // Process all visual elements
-    const visualElements = svgDoc.querySelectorAll('path, rect, circle, ellipse, line, polyline, polygon, text, tspan, g');
+    const visualElements = svgDoc.querySelectorAll('path, rect, circle, ellipse, line, polyline, polygon, text, tspan');
+    console.log(`Found ${visualElements.length} visual elements to modify`);
     visualElements.forEach(overrideElementColor);
     
-    // Remove any style blocks
+    // Process groups (g elements) - they can have fills that affect children
+    const groups = svgDoc.querySelectorAll('g');
+    console.log(`Found ${groups.length} group elements to modify`);
+    groups.forEach(overrideElementColor);
+    
+    // Remove any style blocks that might override our attributes
     const styleBlocks = svgDoc.querySelectorAll('style');
     styleBlocks.forEach(styleEl => {
+      console.log('Removing style block that might override colors');
       styleEl.textContent = '';
     });
     
     // Handle defs section - remove gradients, patterns, etc.
     const defs = svgDoc.querySelectorAll('linearGradient, radialGradient, pattern');
+    console.log(`Found ${defs.length} gradient/pattern definitions`);
     defs.forEach(def => {
       // Find elements using this def
       const id = def.getAttribute('id');
       if (id) {
         const users = svgDoc.querySelectorAll(`[fill="url(#${id})"], [stroke="url(#${id})"]`);
+        console.log(`Found ${users.length} elements using gradient/pattern #${id}`);
         users.forEach(el => {
           el.setAttribute('fill', newColor);
-          if (el.hasAttribute('stroke') && el.getAttribute('stroke') !== 'none') {
+          console.log(`Replaced gradient with solid color on element`);
+          if (el.hasAttribute('stroke') && el.getAttribute('stroke').includes(`url(#${id})`)) {
             el.setAttribute('stroke', newColor);
           }
         });
       }
     });
     
-    return serializer.serializeToString(svgDoc);
+    const result = serializer.serializeToString(svgDoc);
+    console.log(`Color modification complete. New SVG length: ${result.length}`);
+    console.log(`First 100 chars of modified SVG: ${result.substring(0, 100)}`);
+    return result;
   } catch (error) {
     console.error('Error modifying SVG color:', error);
     // Fallback to the basic string replacement if DOM manipulation fails
+    console.log('Using emergency fallback for color modification due to error');
     let modifiedSvg = svgString.replace(/fill="[^"]*"/g, `fill="${newColor}"`);
     modifiedSvg = modifiedSvg.replace(/stroke="[^"]*"/g, `stroke="${newColor}"`);
     return modifiedSvg;

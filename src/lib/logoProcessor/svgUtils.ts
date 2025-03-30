@@ -46,19 +46,33 @@ export const applyColorToSvg = (
   color: string,
   colors: string[]
 ): string => {
+  console.log(`Applying color to SVG: ${color}`);
   let modifiedSvg = svgText;
   
   if (color === 'Black') {
+    console.log('Applying black color to SVG elements');
     modifiedSvg = modifySvgColor(modifiedSvg, '#000000');
   } else if (color === 'White') {
+    console.log('Applying white color to SVG elements');
     modifiedSvg = modifySvgColor(modifiedSvg, '#FFFFFF');
   } else if (color === 'Grayscale' && colors.includes('Grayscale')) {
+    console.log('Applying grayscale to SVG elements');
     modifiedSvg = modifySvgColor(modifiedSvg, '#808080');
   } else if (color === 'Inverted' && colors.includes('Inverted')) {
+    console.log('Inverting SVG colors');
     modifiedSvg = invertSvgColors(modifiedSvg);
   } else if (color === 'original') {
     // Keep original colors
+    console.log('Keeping original SVG colors');
     modifiedSvg = svgText;
+  } else if (color.startsWith('#')) {
+    // Handle hex color codes
+    console.log(`Applying hex color ${color} to SVG elements`);
+    modifiedSvg = modifySvgColor(modifiedSvg, color);
+  } else {
+    // Try to handle named colors
+    console.log(`Trying to apply named color ${color} to SVG elements`);
+    modifiedSvg = modifySvgColor(modifiedSvg, color);
   }
   
   return modifiedSvg;

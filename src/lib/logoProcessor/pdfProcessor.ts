@@ -1,4 +1,3 @@
-
 import { createPdfFromSvg, createPdfFromImage } from './pdf';
 import { applyColorToSvg, createSimpleSvgFromRaster, getSvgDimensions } from './svgUtils';
 import { applyColorFilter } from './rasterUtils';
@@ -16,7 +15,7 @@ export const processPdfFromSvg = async (
   const files: ProcessedFile[] = [];
   
   try {
-    console.log('Generating vector PDF from SVG for', color);
+    console.log('Generating vector PDF from SVG for color:', color);
     console.log('SVG input length:', svgText.length);
     
     if (!svgText || svgText.length < 10) {
@@ -30,30 +29,33 @@ export const processPdfFromSvg = async (
     // For specific color variations, apply special color handling
     if (color === 'Black') {
       // Convert all elements to black
+      console.log('Applying BLACK color to SVG');
       modifiedSvg = applyColorToSvg(svgText, '#000000', colors);
-      console.log('Applied black color to SVG');
     } else if (color === 'White') {
       // Convert all elements to white
+      console.log('Applying WHITE color to SVG');
       modifiedSvg = applyColorToSvg(svgText, '#FFFFFF', colors);
-      console.log('Applied white color to SVG');
     } else if (color === 'original') {
       // Keep original colors from the SVG
+      console.log('Keeping ORIGINAL SVG colors');
       modifiedSvg = svgText;
-      console.log('Keeping original SVG colors');
     } else {
       // Apply specific color as requested
+      console.log(`Applying custom color ${color} to SVG`);
       modifiedSvg = applyColorToSvg(svgText, color, colors);
-      console.log(`Applied custom color ${color} to SVG`);
     }
+    
+    console.log('Modified SVG for color:', color);
+    console.log('First 100 chars of modified SVG:', modifiedSvg.substring(0, 100));
     
     // Extract dimensions for better positioning
     const dimensions = getSvgDimensions(modifiedSvg);
     console.log('SVG dimensions:', dimensions);
     
     // Create PDF with embedded SVG as vector
-    console.log('Starting PDF creation from SVG');
+    console.log('Starting PDF creation from SVG for color:', color);
     const pdfBlob = await createPdfFromSvg(modifiedSvg);
-    console.log('PDF creation completed, blob size:', pdfBlob.size);
+    console.log('PDF creation completed for color:', color, 'blob size:', pdfBlob.size);
     
     if (!pdfBlob || pdfBlob.size < 100) {
       console.error('PDF blob is too small or empty');
@@ -85,6 +87,27 @@ export const processPdfFromSvg = async (
         const height = svgElement.getAttribute('height') || '300';
         svgElement.setAttribute('viewBox', `0 0 ${width} ${height}`);
         console.log('Added missing viewBox to SVG');
+      }
+      
+      // Apply color again in the fallback method
+      if (color === 'Black') {
+        svgElement.querySelectorAll('*').forEach(el => {
+          if (el.tagName !== 'svg') {
+            el.setAttribute('fill', '#000000');
+            if (el.hasAttribute('stroke') && el.getAttribute('stroke') !== 'none') {
+              el.setAttribute('stroke', '#000000');
+            }
+          }
+        });
+      } else if (color === 'White') {
+        svgElement.querySelectorAll('*').forEach(el => {
+          if (el.tagName !== 'svg') {
+            el.setAttribute('fill', '#FFFFFF');
+            if (el.hasAttribute('stroke') && el.getAttribute('stroke') !== 'none') {
+              el.setAttribute('stroke', '#FFFFFF');
+            }
+          }
+        });
       }
       
       const serializer = new XMLSerializer();
