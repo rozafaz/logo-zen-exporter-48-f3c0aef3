@@ -5,7 +5,6 @@ import { ArrowDown, Check, Download, Loader2, Bug } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ExportSettings } from './ExportOptions';
 import { exportLogoPackage } from '@/lib/exportHelpers';
-import { testZipDownload } from '@/lib/logoProcessor';
 
 interface ExportButtonProps {
   logoFile: File | null;
@@ -44,16 +43,17 @@ const ExportButton: React.FC<ExportButtonProps> = ({
     }
     
     setIsExporting(true);
+    toast.info('Sending logo to server for processing...');
     
     try {
       console.log('Starting export process with settings:', settings);
       console.log('Logo file type:', logoFile.type, 'name:', logoFile.name, 'size:', logoFile.size);
       
-      // Perform export
+      // Perform export - now calls the backend API
       await exportLogoPackage(logoFile, settings);
       
       setIsComplete(true);
-      toast.success('Export complete! Files ready for download.');
+      toast.success('Export complete! Files downloaded.');
       
       // Reset the complete state after 3 seconds
       setTimeout(() => {
@@ -64,16 +64,6 @@ const ExportButton: React.FC<ExportButtonProps> = ({
       toast.error(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsExporting(false);
-    }
-  };
-  
-  const handleTestDownload = () => {
-    try {
-      testZipDownload();
-      toast.success('Test download initiated');
-    } catch (error) {
-      console.error('Test download error:', error);
-      toast.error('Test download failed');
     }
   };
   
@@ -96,7 +86,7 @@ const ExportButton: React.FC<ExportButtonProps> = ({
         {isExporting ? (
           <>
             <Loader2 className="w-5 h-5 animate-spin" />
-            <span>Exporting Logo Package...</span>
+            <span>Processing on Server...</span>
           </>
         ) : isComplete ? (
           <>
@@ -114,16 +104,6 @@ const ExportButton: React.FC<ExportButtonProps> = ({
           <ArrowDown className="w-4 h-4" />
         </div>
       </button>
-      
-      {process.env.NODE_ENV !== 'production' && (
-        <button
-          onClick={handleTestDownload}
-          className="w-full py-2 rounded-xl font-medium transition-all bg-secondary hover:bg-secondary/90 text-secondary-foreground flex items-center justify-center gap-2"
-        >
-          <Bug className="w-4 h-4" />
-          <span className="text-xs">Test ZIP Download</span>
-        </button>
-      )}
     </div>
   );
 };

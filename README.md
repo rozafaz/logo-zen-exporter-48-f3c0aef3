@@ -1,69 +1,93 @@
-# Welcome to your Lovable project
 
-## Project info
+# AI Logo Package Exporter
 
-**URL**: https://lovable.dev/projects/174a1a24-78a7-4b33-9363-9350800147bd
+An application for automating logo export workflow with precision and efficiency. This application processes logo files in various formats and colors for professional branding packages.
 
-## How can I edit this code?
+## Frontend
 
-There are several ways of editing your application.
+A React application that provides a user interface for:
+- Uploading logo files
+- Setting export options (formats, colors, resolutions)
+- Previewing generated files
+- Downloading the final ZIP package
 
-**Use Lovable**
+The frontend is built with:
+- React
+- TypeScript
+- Tailwind CSS
+- shadcn/ui components
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/174a1a24-78a7-4b33-9363-9350800147bd) and start prompting.
+## Backend
 
-Changes made via Lovable will be committed automatically to this repo.
+A Node.js/Express server that handles the actual logo processing:
+- Receives logo files and export settings from the frontend
+- Processes logos into various formats and color variations
+- Generates a ZIP package with all files
+- Sends the ZIP back to the frontend for download
 
-**Use your preferred IDE**
+The backend uses:
+- Express.js for API endpoints
+- Multer for file uploads
+- Puppeteer for rendering and capturing images
+- SVGO for SVG optimization
+- PDF-lib for PDF creation
+- JSZip for creating ZIP archives
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Getting Started
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Frontend
 
-Follow these steps:
+1. Install dependencies:
+```
+npm install
+```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+2. Start the development server:
+```
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Backend
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+1. Navigate to the server directory:
+```
+cd server
+```
 
-**Use GitHub Codespaces**
+2. Install dependencies:
+```
+npm install
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+3. Start the development server:
+```
+npm run dev
+```
 
-## What technologies are used for this project?
+The backend server will run on port 5000 by default.
 
-This project is built with .
+## Configuration
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+The frontend connects to the backend API at `http://localhost:5000` by default. To change this:
 
-## How can I deploy this project?
+1. Update the `API_URL` constant in `src/lib/exportHelpers.ts`
 
-Simply open [Lovable](https://lovable.dev/projects/174a1a24-78a7-4b33-9363-9350800147bd) and click on Share -> Publish.
+## Deployment
 
-## I want to use a custom domain - is that possible?
+### Frontend
 
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+Build the frontend for production:
+```
+npm run build
+```
+
+### Backend
+
+For production deployment, consider:
+- Setting environment variables
+- Using a process manager like PM2
+- Setting up a reverse proxy with Nginx or similar
+
+## License
+
+MIT
