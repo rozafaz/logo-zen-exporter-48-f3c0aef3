@@ -2,7 +2,7 @@ import type { ExportSettings } from '@/components/ExportOptions';
 import { toast } from 'sonner';
 
 // Backend API URL (update this based on your deployment)
-const API_URL = 'http://localhost:5000';
+const API_URL = 'http://localhost:5001';
 
 /**
  * Handles the export process for logo files by sending to backend

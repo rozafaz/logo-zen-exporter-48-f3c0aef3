@@ -15,7 +15,7 @@ npm install
 npm run dev
 ```
 
-The server will start on port 5000 by default (can be changed by setting the PORT environment variable).
+The server will start on port 5001 by default (can be changed by setting the PORT environment variable).
 
 ## API Endpoints
 

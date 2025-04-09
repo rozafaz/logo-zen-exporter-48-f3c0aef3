@@ -64,11 +64,11 @@ npm install
 npm run dev
 ```
 
-The backend server will run on port 5000 by default.
+The backend server will run on port 5001 by default.
 
 ## Configuration
 
-The frontend connects to the backend API at `http://localhost:5000` by default. To change this:
+The frontend connects to the backend API at `http://localhost:5001` by default. To change this:
 
 1. Update the `API_URL` constant in `src/lib/exportHelpers.ts`
 

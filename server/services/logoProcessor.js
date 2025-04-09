@@ -566,58 +566,37 @@ async function optimizeSvg(svgText) {
  */
 async function applySvgColor(svgText, color) {
   try {
-    if (color === 'original') {
+    if (color.toLowerCase() === 'original') {
       return svgText;
     }
     
-    const parser = new (require('jsdom').JSDOM).window.DOMParser();
-    const serializer = new (require('jsdom').JSDOM).window.XMLSerializer();
-    const svgDoc = parser.parseFromString(svgText, 'image/svg+xml');
+    const { JSDOM } = require('jsdom');
+
+    const dom = new JSDOM(svgText, { contentType: 'image/svg+xml' });
+    const document = dom.window.document;
+
+    const newColor = color.toLowerCase() === 'black' ? '#000000'
+                    : color.toLowerCase() === 'white' ? '#FFFFFF'
+                    : color.toLowerCase() === 'grayscale' ? '#808080'
+                    : color;
+
+    // Modify each element except the root <svg> element
+    document.querySelectorAll('*').forEach(el => {
+      if (el.tagName.toLowerCase() !== 'svg') {
+        el.setAttribute('fill', newColor);
+        if (el.hasAttribute('stroke') && el.getAttribute('stroke').toLowerCase() !== 'none') {
+          el.setAttribute('stroke', newColor);
+        }
+        // Optionally, remove any conflicting inline style for fill, if present
+        if (el.hasAttribute('style')) {
+          const updatedStyle = el.getAttribute('style').replace(/fill\s*:\s*[^;]+;?/gi, '');
+          el.setAttribute('style', updatedStyle);
+        }
+      }
+    });
     
-    // Apply color based on requested variation
-    if (color === 'Black') {
-      // Convert all elements to black
-      svgDoc.querySelectorAll('*').forEach(el => {
-        if (el.tagName !== 'svg') {
-          el.setAttribute('fill', '#000000');
-          if (el.hasAttribute('stroke') && el.getAttribute('stroke') !== 'none') {
-            el.setAttribute('stroke', '#000000');
-          }
-        }
-      });
-    } else if (color === 'White') {
-      // Convert all elements to white
-      svgDoc.querySelectorAll('*').forEach(el => {
-        if (el.tagName !== 'svg') {
-          el.setAttribute('fill', '#FFFFFF');
-          if (el.hasAttribute('stroke') && el.getAttribute('stroke') !== 'none') {
-            el.setAttribute('stroke', '#FFFFFF');
-          }
-        }
-      });
-    } else if (color === 'Grayscale') {
-      // Convert to grayscale (not fully implemented, simplified to gray)
-      svgDoc.querySelectorAll('*').forEach(el => {
-        if (el.tagName !== 'svg') {
-          el.setAttribute('fill', '#808080');
-          if (el.hasAttribute('stroke') && el.getAttribute('stroke') !== 'none') {
-            el.setAttribute('stroke', '#808080');
-          }
-        }
-      });
-    } else if (color.startsWith('#')) {
-      // Handle hex color codes
-      svgDoc.querySelectorAll('*').forEach(el => {
-        if (el.tagName !== 'svg') {
-          el.setAttribute('fill', color);
-          if (el.hasAttribute('stroke') && el.getAttribute('stroke') !== 'none') {
-            el.setAttribute('stroke', color);
-          }
-        }
-      });
-    }
-    
-    return serializer.serializeToString(svgDoc);
+    // Return the modified SVG as a string
+    return document.documentElement.outerHTML;
   } catch (error) {
     console.error('Error applying color to SVG:', error);
     return svgText;
