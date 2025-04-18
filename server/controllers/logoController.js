@@ -59,6 +59,9 @@ exports.processLogo = async (req, res) => {
     console.log(`Successfully processed ${fileName} and sent ZIP package`);
   } catch (error) {
     console.error('Error in logo processing:', error);
+    if (error.message.startsWith('Invalid SVG file')) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
     res.status(500).json({ 
       success: false, 
       message: 'Error processing logo', 

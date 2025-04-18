@@ -4,6 +4,7 @@ const fs = require('fs').promises;
 const { PDFDocument } = require('pdf-lib');
 const puppeteer = require('puppeteer');
 const { optimize } = require('svgo');
+const cheerio = require('cheerio');
 
 /**
  * Main function to process a logo file
@@ -24,6 +25,15 @@ exports.processLogoFile = async (filePath, fileName, fileType, settings) => {
     // Process SVG
     if (isSvg) {
       const svgText = fileContent.toString('utf8');
+
+    // Validate XML syntax
+    try {
+        cheerio.load(svgText, { xmlMode: true });
+    } catch (err) {
+        console.error('SVG validation failed:', err);
+        throw new Error('Invalid SVG file: malformed XML');
+    }
+    // --------------------------------
       
       // Process for each color variation
       for (const color of colors) {
