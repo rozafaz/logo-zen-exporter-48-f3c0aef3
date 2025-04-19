@@ -13,7 +13,7 @@ const port = process.env.PORT || 5001;
 app.use(cors());
 app.use(express.json());
 
-// Configure multer storage
+// Configure multer storage with cleanup
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
     const uploadDir = path.join(__dirname, 'uploads');
@@ -39,6 +39,13 @@ app.post('/api/process-logo', upload.single('logo'), processLogo);
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Server error:', err);
+  if (err.message === 'Inkscape not found') {
+    return res.status(500).json({
+      success: false,
+      message: 'Server configuration error: Inkscape is not installed',
+      error: err.message
+    });
+  }
   res.status(500).json({ 
     success: false, 
     message: 'Server error', 
@@ -50,3 +57,4 @@ app.use((err, req, res, next) => {
 app.listen(port, () => {
   console.log(`Logo processor server running on port ${port}`);
 });
+

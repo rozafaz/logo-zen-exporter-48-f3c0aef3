@@ -165,4 +165,3 @@ function transformSvgColor(svgText, color) {
   // 5) Serialize back to string
   return $.xml();
 }
-
