@@ -1,8 +1,9 @@
+
 import type { ExportSettings } from '@/components/ExportOptions';
 import { toast } from 'sonner';
 
 // Backend API URL (update this based on your deployment)
-const API_URL = 'http://localhost:5001';
+const API_URL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5001';
 
 /**
  * Handles the export process for logo files by sending to backend
@@ -31,39 +32,53 @@ export const exportLogoPackage = async (logoFile: File, settings: ExportSettings
     formData.append('logo', logoFile);
     formData.append('settings', JSON.stringify(settings));
     
-    // Send request to backend API
-    const response = await fetch(`${API_URL}/api/process-logo`, {
-      method: 'POST',
-      body: formData,
-    });
+    // Send request to backend API with a timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
     
-    if (!response.ok) {
-      // Try to get error message from response
-      let errorMessage = 'Server error processing logo';
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.message || errorMessage;
-      } catch (e) {
-        // If we can't parse the error, use the default message
+    try {
+      const response = await fetch(`${API_URL}/api/process-logo`, {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        // Try to get error message from response
+        let errorMessage = 'Server error processing logo';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (e) {
+          // If we can't parse the error, use the default message
+        }
+        throw new Error(errorMessage);
       }
-      throw new Error(errorMessage);
+      
+      // Get the blob from the response
+      const blob = await response.blob();
+      
+      // Create a download link and trigger it
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${settings.brandName}_logo_package.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      console.log('Download initiated');
+      return;
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        throw new Error('Request timed out. The server might be busy or Inkscape processing might be taking too long.');
+      }
+      throw fetchError;
     }
-    
-    // Get the blob from the response
-    const blob = await response.blob();
-    
-    // Create a download link and trigger it
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${settings.brandName}_logo_package.zip`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-    
-    console.log('Download initiated');
-    return;
   } catch (error) {
     console.error('Export error:', error);
     throw error;

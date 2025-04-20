@@ -10,6 +10,24 @@ const execFileAsync = util.promisify(execFile);
 const INKSCAPE_PATH = 'inkscape';
 
 /**
+ * Check if Inkscape is installed and available
+ */
+async function checkInkscapeAvailability() {
+  try {
+    // Try to execute inkscape --version
+    const { stdout } = await execFileAsync(INKSCAPE_PATH, ['--version']);
+    console.log('Inkscape installation detected:', stdout.trim());
+    return { available: true, version: stdout.trim() };
+  } catch (error) {
+    console.error('Inkscape not available:', error.message);
+    // Throw a specific error that can be caught higher up
+    const e = new Error('Inkscape not found');
+    e.code = 'INKSCAPE_NOT_AVAILABLE';
+    throw e;
+  }
+}
+
+/**
  * Process a logo SVG into multiple formats, colors, and resolutions.
  */
 exports.processLogoFile = async (filePath, fileName, fileType, settings) => {
@@ -21,6 +39,9 @@ exports.processLogoFile = async (filePath, fileName, fileType, settings) => {
     throw new Error('Only SVG inputs are supported');
   }
 
+  // Check if Inkscape is available
+  await checkInkscapeAvailability();
+
   // Load and validate
   const svgText = await fs.readFile(filePath, 'utf8');
   try { cheerio.load(svgText, { xmlMode: true }); } catch {
@@ -28,6 +49,7 @@ exports.processLogoFile = async (filePath, fileName, fileType, settings) => {
   }
 
   for (const color of colors) {
+    console.log(`Processing color variation: ${color}`);
     const transformedSvg = transformSvgColor(svgText, color);
     const tempPath = await writeTempFile(transformedSvg, 'svg');
 
@@ -48,18 +70,35 @@ exports.processLogoFile = async (filePath, fileName, fileType, settings) => {
             const args = [`--export-type=${ext}`];
             if (ext === 'png') args.push('--export-dpi', String(isNaN(dpi) ? 300 : dpi));
             args.push('--export-area-drawing', '--export-area-page');
-            await execFileAsync(INKSCAPE_PATH, [tempPath, ...args, `--export-filename=${out}`]);
-            const data = await fs.readFile(out);
-            outputFiles.push({ folder: format, filename: `${brandName}_${color}_${label}.${ext}`, data });
-            await fs.unlink(out);
+            args.push(`--export-filename=${out}`);
+            
+            console.log(`Running Inkscape command: inkscape ${args.join(' ')} ${tempPath}`);
+            
+            try {
+              await execFileAsync(INKSCAPE_PATH, [tempPath, ...args], {
+                timeout: 30000 // 30-second timeout for Inkscape operations
+              });
+              
+              const data = await fs.readFile(out);
+              outputFiles.push({ folder: format, filename: `${brandName}_${color}_${label}.${ext}`, data });
+              await fs.unlink(out);
+            } catch (inkscapeError) {
+              console.error(`Inkscape error converting to ${format}@${label}:`, inkscapeError);
+              throw new Error(`Inkscape failed to convert to ${format}: ${inkscapeError.message}`);
+            }
           }
         } catch (e) {
           console.error(`Error exporting ${format}@${label} for ${color}:`, e);
+          throw e; // Propagate the error up
         }
       }
     }
 
-    await fs.unlink(tempPath);
+    try {
+      await fs.unlink(tempPath);
+    } catch (error) {
+      console.warn(`Could not delete temp file ${tempPath}:`, error.message);
+    }
   }
 
   return outputFiles;
@@ -68,8 +107,14 @@ exports.processLogoFile = async (filePath, fileName, fileType, settings) => {
 async function writeTempFile(content, ext) {
   const name = `logo-${crypto.randomUUID()}.${ext}`;
   const p = path.join(os.tmpdir(), name);
-  await fs.writeFile(p, content, 'utf8');
-  return p;
+  try {
+    await fs.writeFile(p, content, 'utf8');
+    console.log(`Temporary file created: ${p}`);
+    return p;
+  } catch (error) {
+    console.error(`Error creating temporary file at ${p}:`, error);
+    throw new Error(`Failed to create temporary file: ${error.message}`);
+  }
 }
 
 /**
@@ -144,7 +189,7 @@ function transformSvgColor(svgText, color) {
     root.prepend(defs);
   }
 
-  // 3) Add our “toOneColor” filter
+  // 3) Add our "toOneColor" filter
   const filterId = 'svg2OneColor';
   defs.append(`
     <filter id="${filterId}" color-interpolation-filters="sRGB">
