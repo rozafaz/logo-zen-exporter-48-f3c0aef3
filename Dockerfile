@@ -42,5 +42,5 @@ COPY server/ server/
 COPY --from=builder /app/dist server/public
 
 # 2.5 Expose your app’s port and set start command
-EXPOSE 3000
+EXPOSE 5001
 CMD ["node", "server/server.js"]
