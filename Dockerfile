@@ -1,3 +1,4 @@
+
 # ┌────────────────────────────────────────────┐
 # │ 1) BUILD FRONT‑END ASSETS WITH VITE/INKSCAPE
 # └────────────────────────────────────────────┘
@@ -38,9 +39,9 @@ RUN cd server && npm ci --production
 # 2.3 Copy server source code
 COPY server/ server/
 
-# 2.4 Inject built front‑end into server’s public folder
+# 2.4 Inject built front‑end into server's public folder
 COPY --from=builder /app/dist server/public
 
-# 2.5 Expose your app’s port and set start command
-EXPOSE 5001
+# 2.5 Expose your app's port and set start command
+EXPOSE 3000
 CMD ["node", "server/server.js"]
