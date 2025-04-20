@@ -1,3 +1,4 @@
+
 import type { ExportSettings } from '@/components/ExportOptions';
 import { toast } from 'sonner';
 
@@ -14,10 +15,10 @@ export const checkServerAndInkscape = async (): Promise<{
   version?: string;
 }> => {
   try {
-    // First check if server is running
+    // First check if server is running with a much longer timeout (30 seconds)
     const healthResponse = await fetch(`${API_URL}/api/health`, { 
       method: 'GET',
-      signal: AbortSignal.timeout(3000) // 3 second timeout
+      signal: AbortSignal.timeout(30000) // 30 second timeout (increased from 3s)
     });
     
     if (!healthResponse.ok) {
@@ -28,13 +29,26 @@ export const checkServerAndInkscape = async (): Promise<{
       };
     }
     
-    // Then check if Inkscape is available
+    // Then check if Inkscape is available with a longer timeout
     const inkscapeResponse = await fetch(`${API_URL}/api/check-inkscape`, {
       method: 'GET',
-      signal: AbortSignal.timeout(5000) // 5 second timeout
+      signal: AbortSignal.timeout(30000) // 30 second timeout (increased from 5s)
     });
     
-    const data = await inkscapeResponse.json();
+    let data;
+    try {
+      data = await inkscapeResponse.json();
+    } catch (jsonError) {
+      console.error('Failed to parse JSON response:', jsonError);
+      console.log('Response status:', inkscapeResponse.status);
+      console.log('Response text:', await inkscapeResponse.text());
+      
+      return {
+        serverRunning: true,
+        inkscapeAvailable: false,
+        message: `Server response format error: Expected JSON but received HTML or text. This usually means the server is not properly configured or the API endpoints aren't implemented.`
+      };
+    }
     
     if (inkscapeResponse.ok && data.success) {
       return {
@@ -100,9 +114,9 @@ export const exportLogoPackage = async (logoFile: File, settings: ExportSettings
     formData.append('logo', logoFile);
     formData.append('settings', JSON.stringify(settings));
     
-    // Send request to backend API with a timeout
+    // Send request to backend API with a much longer timeout
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minute timeout (increased from 60s)
     
     try {
       const response = await fetch(`${API_URL}/api/process-logo`, {
@@ -120,7 +134,13 @@ export const exportLogoPackage = async (logoFile: File, settings: ExportSettings
           const errorData = await response.json();
           errorMessage = errorData.message || errorMessage;
         } catch (e) {
-          // If we can't parse the error, use the default message
+          // If the response isn't JSON, get the text instead
+          try {
+            const text = await response.text();
+            errorMessage = `Server returned non-JSON response. Status: ${response.status}. First 100 chars: ${text.substring(0, 100)}...`;
+          } catch (textError) {
+            // If we can't parse the text, use the default message
+          }
         }
         throw new Error(errorMessage);
       }
