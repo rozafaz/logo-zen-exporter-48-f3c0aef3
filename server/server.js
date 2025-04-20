@@ -10,7 +10,7 @@ const util = require('util');
 
 const execFileAsync = util.promisify(execFile);
 const app = express();
-const port = process.env.PORT || 5001;
+const port = process.env.PORT || 3000; // Changed port to 3000
 
 // Middleware
 app.use(cors());
