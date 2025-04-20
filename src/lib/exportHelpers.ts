@@ -6,12 +6,81 @@ import { toast } from 'sonner';
 const API_URL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5001';
 
 /**
+ * Check if the server is running and Inkscape is available
+ */
+export const checkServerAndInkscape = async (): Promise<{
+  serverRunning: boolean;
+  inkscapeAvailable: boolean;
+  message: string;
+  version?: string;
+}> => {
+  try {
+    // First check if server is running
+    const healthResponse = await fetch(`${API_URL}/api/health`, { 
+      method: 'GET',
+      signal: AbortSignal.timeout(3000) // 3 second timeout
+    });
+    
+    if (!healthResponse.ok) {
+      return {
+        serverRunning: false,
+        inkscapeAvailable: false,
+        message: 'Server is not responding. Please ensure the backend server is running.'
+      };
+    }
+    
+    // Then check if Inkscape is available
+    const inkscapeResponse = await fetch(`${API_URL}/api/check-inkscape`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(5000) // 5 second timeout
+    });
+    
+    const data = await inkscapeResponse.json();
+    
+    if (inkscapeResponse.ok && data.success) {
+      return {
+        serverRunning: true,
+        inkscapeAvailable: true,
+        message: 'Server is running and Inkscape is available',
+        version: data.version
+      };
+    } else {
+      return {
+        serverRunning: true,
+        inkscapeAvailable: false,
+        message: `Server is running but Inkscape is not available: ${data.error || 'Unknown error'}`
+      };
+    }
+  } catch (error) {
+    console.error('Error checking server and Inkscape:', error);
+    return {
+      serverRunning: false,
+      inkscapeAvailable: false,
+      message: `Connection error: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+};
+
+/**
  * Handles the export process for logo files by sending to backend
  */
 export const exportLogoPackage = async (logoFile: File, settings: ExportSettings): Promise<void> => {
   console.log('Starting export process:', logoFile.name, logoFile.type);
   
   try {
+    // First check if server and Inkscape are available
+    const { serverRunning, inkscapeAvailable, message } = await checkServerAndInkscape();
+    
+    if (!serverRunning) {
+      toast.error("Server connection failed: " + message);
+      throw new Error(message);
+    }
+    
+    if (!inkscapeAvailable) {
+      toast.error("Inkscape not available: " + message);
+      throw new Error(message);
+    }
+    
     // Validate formats
     if (settings.formats.length === 0) {
       throw new Error('Please select at least one export format');

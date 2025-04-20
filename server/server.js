@@ -5,7 +5,10 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
 const { processLogo } = require('./controllers/logoController');
+const { execFile } = require('child_process');
+const util = require('util');
 
+const execFileAsync = util.promisify(execFile);
 const app = express();
 const port = process.env.PORT || 5001;
 
@@ -33,6 +36,38 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+// Diagnostic endpoint to check if Inkscape is available
+app.get('/api/check-inkscape', async (req, res) => {
+  try {
+    // Try to execute inkscape --version
+    const { stdout } = await execFileAsync('inkscape', ['--version'], { timeout: 5000 });
+    res.json({ 
+      success: true, 
+      message: 'Inkscape is available', 
+      version: stdout.trim(),
+      serverStatus: 'Server is running correctly'
+    });
+  } catch (error) {
+    console.error('Inkscape check failed:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Inkscape not available',
+      error: error.message,
+      code: error.code,
+      serverStatus: 'Server is running but Inkscape is not available'
+    });
+  }
+});
+
+// Server health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: 'Server is running',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Routes
 app.post('/api/process-logo', upload.single('logo'), processLogo);
 
@@ -57,4 +92,3 @@ app.use((err, req, res, next) => {
 app.listen(port, () => {
   console.log(`Logo processor server running on port ${port}`);
 });
-
