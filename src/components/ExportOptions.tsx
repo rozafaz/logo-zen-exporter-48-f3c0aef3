@@ -1,12 +1,11 @@
+
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { 
-  Tabs, TabsContent, TabsList, TabsTrigger 
-} from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
-import { 
-  CheckCircle, CheckCircle2, Circle, Image, File, Check
-} from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { File, Image } from 'lucide-react';
+import FormatOption from './export/FormatOption';
+import ResolutionOption from './export/ResolutionOption';
+import ColorOption from './export/ColorOption';
 
 export interface ExportSettings {
   formats: string[];
@@ -36,7 +35,6 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
 
   const toggleOption = (key: keyof ExportSettings, option: string) => {
     const currentOptions = settings[key] as string[];
-    
     if (currentOptions.includes(option)) {
       updateSettings(key, currentOptions.filter(item => item !== option));
     } else {
@@ -186,119 +184,5 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
     </div>
   );
 };
-
-interface FormatOptionProps {
-  icon: React.ReactNode;
-  label: string;
-  description: string;
-  isSelected: boolean;
-  onClick: () => void;
-}
-
-const FormatOption: React.FC<FormatOptionProps> = ({ 
-  icon, label, description, isSelected, onClick 
-}) => (
-  <button 
-    className={cn(
-      "flex items-center p-3 rounded-lg border transition-all",
-      isSelected 
-        ? "border-primary bg-primary/5 hover:bg-primary/10"
-        : "border-border hover:border-primary/30 hover:bg-secondary"
-    )}
-    onClick={onClick}
-  >
-    <div className="mr-3 text-primary">
-      {icon}
-    </div>
-    <div className="text-left">
-      <div className="font-medium text-sm flex items-center">
-        {label}
-        {isSelected && <Check className="w-3.5 h-3.5 ml-1.5 text-primary" />}
-      </div>
-      <div className="text-xs text-muted-foreground">{description}</div>
-    </div>
-  </button>
-);
-
-interface ResolutionOptionProps {
-  label: string;
-  description: string;
-  isSelected: boolean;
-  onClick: () => void;
-}
-
-const ResolutionOption: React.FC<ResolutionOptionProps> = ({
-  label, description, isSelected, onClick
-}) => (
-  <button
-    className={cn(
-      "flex items-center px-3 py-2 rounded-lg border transition-all",
-      isSelected 
-        ? "border-primary bg-primary/5 hover:bg-primary/10"
-        : "border-border hover:border-primary/30 hover:bg-secondary"
-    )}
-    onClick={onClick}
-  >
-    <div className="text-left flex items-center">
-      <div className="mr-2">
-        {isSelected 
-          ? <CheckCircle className="w-4 h-4 text-primary" /> 
-          : <Circle className="w-4 h-4 text-muted-foreground" />
-        }
-      </div>
-      <div>
-        <div className="font-medium text-sm">{label}</div>
-        <div className="text-xs text-muted-foreground">{description}</div>
-      </div>
-    </div>
-  </button>
-);
-
-interface ColorOptionProps {
-  label: string;
-  colorPreview: string;
-  isSelected: boolean;
-  onClick: () => void;
-}
-
-const ColorOption: React.FC<ColorOptionProps> = ({
-  label, colorPreview, isSelected, onClick
-}) => (
-  <button
-    className={cn(
-      "flex items-center p-3 rounded-lg border transition-all",
-      isSelected 
-        ? "border-primary bg-primary/5 hover:bg-primary/10"
-        : "border-border hover:border-primary/30 hover:bg-secondary"
-    )}
-    onClick={onClick}
-  >
-    <div 
-      className="w-8 h-8 rounded-full mr-3"
-      style={{ 
-        backgroundColor: colorPreview,
-        boxShadow: colorPreview === '#FFFFFF' 
-          ? 'inset 0 0 0 1px rgba(0,0,0,0.1)' 
-          : 'none'
-      }}
-    >
-      {isSelected && (
-        <div className="w-full h-full flex items-center justify-center">
-          <CheckCircle2 
-            className={cn(
-              "w-4 h-4", 
-              colorPreview === '#FFFFFF' || colorPreview === '#DDDDDD' 
-                ? "text-black" 
-                : "text-white"
-            )} 
-          />
-        </div>
-      )}
-    </div>
-    <div className="text-left">
-      <div className="font-medium text-sm">{label}</div>
-    </div>
-  </button>
-);
 
 export default ExportOptions;
