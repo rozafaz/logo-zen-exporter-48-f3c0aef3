@@ -76,6 +76,13 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
             />
             <FormatOption 
               icon={<File className="w-4 h-4" />}
+              label="EPS" 
+              description="Professional print"
+              isSelected={isSelected('formats', 'EPS')}
+              onClick={() => toggleOption('formats', 'EPS')}
+            />
+            <FormatOption 
+              icon={<File className="w-4 h-4" />}
               label="PDF" 
               description="Vector document"
               isSelected={isSelected('formats', 'PDF')}
