@@ -11,6 +11,8 @@ import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const profileSchema = z.object({
   username: z.string().min(3).max(20).optional(),
@@ -75,7 +77,15 @@ const Profile = () => {
   return (
     <div className="container py-12">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">Your Profile</h1>
+        <div className="flex items-center mb-6">
+          <Button variant="ghost" size="icon" asChild className="mr-2">
+            <Link to="/">
+              <ArrowLeft className="h-5 w-5" />
+              <span className="sr-only">Back to homepage</span>
+            </Link>
+          </Button>
+          <h1 className="text-3xl font-bold">Your Profile</h1>
+        </div>
         
         <Card className="mb-6 animate-fade-in">
           <CardHeader>
@@ -165,9 +175,14 @@ const Profile = () => {
                   {isSubmitting ? "Saving..." : "Save Changes"}
                 </Button>
                 
-                <Button variant="destructive" type="button" onClick={() => signOut()}>
-                  Sign Out
-                </Button>
+                <div className="flex items-center space-x-2">
+                  <Button variant="outline" asChild>
+                    <Link to="/">Back to Homepage</Link>
+                  </Button>
+                  <Button variant="destructive" type="button" onClick={() => signOut()}>
+                    Sign Out
+                  </Button>
+                </div>
               </CardFooter>
             </form>
           </Form>
