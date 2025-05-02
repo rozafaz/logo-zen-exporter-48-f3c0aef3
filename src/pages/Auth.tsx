@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState } from 'react';
 import { Navigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
@@ -11,13 +12,13 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const signInSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -44,6 +45,7 @@ const Auth = () => {
   const [showSignInPassword, setShowSignInPassword] = useState(false);
   const [showSignUpPassword, setShowSignUpPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const signInForm = useForm<SignInFormValues>({
     resolver: zodResolver(signInSchema),
@@ -64,25 +66,35 @@ const Auth = () => {
   });
 
   const onSignInSubmit = async (data: SignInFormValues) => {
+    setAuthError(null);
     setIsSubmitting(true);
     try {
       await signIn(data.email, data.password);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Sign in error:", error);
+      
+      // Check for email_not_confirmed error
+      if (error?.value?.code === "email_not_confirmed") {
+        setAuthError("Email not confirmed. Please check your inbox and click the confirmation link to verify your email address.");
+      } else {
+        setAuthError(error?.message || "An error occurred during sign in");
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const onSignUpSubmit = async (data: SignUpFormValues) => {
+    setAuthError(null);
     setIsSubmitting(true);
     try {
       await signUp(data.email, data.password, {
         full_name: data.fullName
       });
       setActiveTab("signIn");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Sign up error:", error);
+      setAuthError(error?.message || "An error occurred during sign up");
     } finally {
       setIsSubmitting(false);
     }
@@ -120,6 +132,14 @@ const Auth = () => {
             <TabsTrigger value="signIn">Sign In</TabsTrigger>
             <TabsTrigger value="signUp">Sign Up</TabsTrigger>
           </TabsList>
+
+          {authError && (
+            <div className="px-6 pt-4">
+              <Alert variant="destructive">
+                <AlertDescription>{authError}</AlertDescription>
+              </Alert>
+            </div>
+          )}
 
           <TabsContent value="signIn">
             <Form {...signInForm}>
