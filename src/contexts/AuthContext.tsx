@@ -1,8 +1,12 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { AuthState, UserProfile } from '@/types/auth';
 import { useToast } from '@/components/ui/use-toast';
+
+// Import the SUPABASE_URL value from the client file
+import { SUPABASE_URL } from '@/integrations/supabase/client';
 
 interface AuthContextType extends AuthState {
   signUp: (email: string, password: string, metadata?: { full_name?: string }) => Promise<void>;
