@@ -15,7 +15,8 @@ export function useAuthRedirect(redirectPath: string = '/auth') {
     // 1. We're definitely not loading
     // 2. There's no user
     // 3. We're not already on the redirectPath (to prevent redirect loops)
-    if (!isLoading && !user && !location.pathname.includes(redirectPath)) {
+    // 4. We're not on the landing page (/) - allow unauthenticated access there
+    if (!isLoading && !user && !location.pathname.includes(redirectPath) && location.pathname !== '/') {
       toast({
         title: "Authentication required",
         description: "Please sign in to access this feature",

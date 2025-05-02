@@ -126,21 +126,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log("Signing out...");
       
-      // Use signOut with proper error handling
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        console.error("Supabase signOut error:", error);
-        throw error;
-      }
-      
-      // Clear local state after successful API call
+      // First clear local state immediately - don't wait for API response
       setState({
         user: null,
         profile: null,
         session: null,
         isLoading: false
       });
+      
+      // Then attempt to sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error("Supabase signOut error:", error);
+        // Even with an error, we keep the user signed out locally
+      }
+      
+      // Force clear any remaining storage
+      localStorage.removeItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token');
       
       console.log("Successfully signed out");
       
@@ -149,19 +152,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     } catch (error: any) {
       console.error("Sign out error:", error);
-      
-      // Even if there's an API error, clear the local state anyway
-      setState({
-        user: null,
-        profile: null,
-        session: null,
-        isLoading: false
-      });
+      // We've already cleared the local state, so the user is effectively signed out
       
       toast({
-        title: "Sign out may not have completed",
-        description: "Please refresh the page to confirm",
-        variant: "destructive",
+        title: "Sign out completed locally",
+        description: "You are now signed out",
       });
     }
   };
