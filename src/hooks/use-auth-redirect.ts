@@ -21,7 +21,7 @@ export function useAuthRedirect(redirectPath: string = '/auth') {
         description: "Please sign in to access this feature",
         variant: "destructive",
       });
-      navigate(redirectPath);
+      navigate(redirectPath, { replace: true }); // Using replace to avoid history buildup
     }
   }, [user, isLoading, navigate, redirectPath, location.pathname, toast]);
   

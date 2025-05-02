@@ -29,6 +29,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log("Auth state change event:", event);
         setState(current => ({ ...current, session, user: session?.user ?? null }));
         
         // Defer profile fetching to avoid recursion
@@ -44,6 +45,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Then check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log("Initial session check:", session ? "Session exists" : "No session");
       setState(current => ({ ...current, session, user: session?.user ?? null, isLoading: false }));
       
       if (session?.user) {
@@ -121,29 +123,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    // First clear the local state immediately - don't wait for API response
-    setState(current => ({ 
-      ...current, 
-      user: null, 
-      profile: null, 
-      session: null 
-    }));
-    
     try {
-      // Then attempt to sign out from Supabase
-      await supabase.auth.signOut().catch(error => {
-        // Catch and handle any errors from signOut but don't throw
-        // This ensures the function continues even if signOut fails
-        console.warn("Sign out API call error:", error);
-        // No need to throw here since we've already cleared the local state
+      console.log("Signing out...");
+      
+      // Use signOut with proper error handling
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error("Supabase signOut error:", error);
+        throw error;
+      }
+      
+      // Clear local state after successful API call
+      setState({
+        user: null,
+        profile: null,
+        session: null,
+        isLoading: false
       });
+      
+      console.log("Successfully signed out");
       
       toast({
         title: "Signed out successfully",
       });
     } catch (error: any) {
-      console.error("Unexpected sign out error:", error);
-      // Don't show error toast since we've still signed the user out locally
+      console.error("Sign out error:", error);
+      
+      // Even if there's an API error, clear the local state anyway
+      setState({
+        user: null,
+        profile: null,
+        session: null,
+        isLoading: false
+      });
+      
+      toast({
+        title: "Sign out may not have completed",
+        description: "Please refresh the page to confirm",
+        variant: "destructive",
+      });
     }
   };
 
