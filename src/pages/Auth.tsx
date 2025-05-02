@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   Card, 
@@ -18,7 +17,7 @@ import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
 
 const signInSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -98,6 +97,19 @@ const Auth = () => {
     <div className="container flex items-center justify-center min-h-[80vh] py-12">
       <Card className="w-[400px] animate-fade-in">
         <CardHeader>
+          <div className="flex items-center mb-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="mr-auto p-0 h-8 w-8" 
+              asChild
+            >
+              <Link to="/">
+                <ArrowLeft size={18} />
+                <span className="sr-only">Back to home</span>
+              </Link>
+            </Button>
+          </div>
           <CardTitle className="text-2xl text-center">Welcome</CardTitle>
           <CardDescription className="text-center">
             Sign in to your account or create a new one
@@ -261,6 +273,11 @@ const Auth = () => {
             </Form>
           </TabsContent>
         </Tabs>
+        <div className="px-6 pb-4 pt-2 text-center">
+          <Button variant="link" asChild>
+            <Link to="/">Back to homepage</Link>
+          </Button>
+        </div>
       </Card>
     </div>
   );
