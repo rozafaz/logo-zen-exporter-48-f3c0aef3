@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -124,8 +123,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
-      if (error) throw error;
       
+      // Always clear the local state regardless of server response
       setState(current => ({ 
         ...current, 
         user: null, 
@@ -133,12 +132,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         session: null 
       }));
       
+      // If there's an error but it's just "Session not found", still treat as success
+      // because the end result is what we want (user is signed out)
+      if (error && !error.message.includes("Session not found")) {
+        throw error;
+      }
+      
       toast({
         title: "Signed out successfully",
       });
     } catch (error: any) {
+      console.error("Sign out error:", error);
       toast({
-        title: "Sign out failed",
+        title: "Sign out error",
         description: error.message,
         variant: "destructive",
       });

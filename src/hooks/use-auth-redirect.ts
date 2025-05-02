@@ -10,6 +10,7 @@ export function useAuthRedirect(redirectPath: string = '/auth') {
   const { toast } = useToast();
   
   useEffect(() => {
+    // Only redirect if we're definitely not loading and there's no user
     if (!isLoading && !user) {
       toast({
         title: "Authentication required",
