@@ -121,33 +121,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    // First clear the local state immediately - don't wait for API response
+    setState(current => ({ 
+      ...current, 
+      user: null, 
+      profile: null, 
+      session: null 
+    }));
+    
     try {
-      const { error } = await supabase.auth.signOut();
-      
-      // Always clear the local state regardless of server response
-      setState(current => ({ 
-        ...current, 
-        user: null, 
-        profile: null, 
-        session: null 
-      }));
-      
-      // If there's an error but it's just "Session not found", still treat as success
-      // because the end result is what we want (user is signed out)
-      if (error && !error.message.includes("Session not found")) {
-        throw error;
-      }
+      // Then attempt to sign out from Supabase
+      await supabase.auth.signOut().catch(error => {
+        // Catch and handle any errors from signOut but don't throw
+        // This ensures the function continues even if signOut fails
+        console.warn("Sign out API call error:", error);
+        // No need to throw here since we've already cleared the local state
+      });
       
       toast({
         title: "Signed out successfully",
       });
     } catch (error: any) {
-      console.error("Sign out error:", error);
-      toast({
-        title: "Sign out error",
-        description: error.message,
-        variant: "destructive",
-      });
+      console.error("Unexpected sign out error:", error);
+      // Don't show error toast since we've still signed the user out locally
     }
   };
 
