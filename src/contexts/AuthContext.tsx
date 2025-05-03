@@ -146,8 +146,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Even with an error, we keep the user signed out locally
       }
       
-      // Force clear any remaining storage
-      localStorage.removeItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token');
+      // Force clear any remaining storage - handle both token types
+      const projectRef = SUPABASE_URL
+        .replace('https://', '')
+        .replace('http://', '')
+        .replace(/\/$/, '')
+        .split('.')[0];
+      
+      // Remove both auth token AND refresh token
+      localStorage.removeItem(`sb-${projectRef}-auth-token`);
+      localStorage.removeItem(`sb-${projectRef}-refresh-token`);
       
       console.log("Successfully signed out");
       
