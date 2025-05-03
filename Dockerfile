@@ -16,7 +16,10 @@ COPY src/       src/
 COPY public/    public/
 COPY index.html postcss.config.js tailwind.config.ts vite.config.ts tsconfig.app.json ./
 
-# 1.4 Build: runs your npm script which should invoke Inkscape and then Vite
+# 1.4 Copy Supabase configuration
+COPY supabase/  supabase/
+
+# 1.5 Build: runs your npm script which should invoke Inkscape and then Vite
 RUN npm run build
 
 
@@ -39,9 +42,12 @@ RUN cd server && npm ci --production
 # 2.3 Copy server source code
 COPY server/ server/
 
-# 2.4 Inject built front‑end into server's public folder
+# 2.4 Copy Supabase edge functions if they exist
+COPY supabase/functions/ /app/supabase/functions/ 2>/dev/null || :
+
+# 2.5 Inject built front‑end into server's public folder
 COPY --from=builder /app/dist server/public
 
-# 2.5 Expose your app's port and set start command
+# 2.6 Expose your app's port and set start command
 EXPOSE 3000
 CMD ["node", "server/server.js"]
