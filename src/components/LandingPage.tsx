@@ -12,6 +12,7 @@ import {
   FileDigit, 
   FileImage 
 } from 'lucide-react';
+import PricingPlans from './PricingPlans';
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -220,6 +221,9 @@ const LandingPage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Add the Pricing Plans Section */}
+        <PricingPlans />
       </div>
     </div>
   );
