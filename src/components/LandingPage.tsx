@@ -28,6 +28,10 @@ const LandingPage: React.FC = () => {
               Create an Account
               <ArrowRight className="h-4 w-4" />
             </Button>
+            <Button onClick={() => navigate('/about')} variant="secondary" className="gap-2">
+              Learn More
+              <ArrowRight className="h-4 w-4" />
+            </Button>
           </div>
         </div>
         
@@ -74,6 +78,9 @@ const LandingPage: React.FC = () => {
                 </Button>
                 <Button onClick={() => navigate('/auth')} variant="outline" size="sm">
                   Sign In
+                </Button>
+                <Button onClick={() => navigate('/about')} variant="secondary" size="sm">
+                  Learn More
                 </Button>
               </div>
             </div>
