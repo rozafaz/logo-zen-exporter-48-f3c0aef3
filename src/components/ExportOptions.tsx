@@ -2,16 +2,19 @@
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { File, Image } from 'lucide-react';
+import { File, Image, Palette } from 'lucide-react';
 import FormatOption from './export/FormatOption';
 import ResolutionOption from './export/ResolutionOption';
 import ColorOption from './export/ColorOption';
+import { Input } from './ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
 export interface ExportSettings {
   formats: string[];
   colors: string[];
   resolutions: string[];
   brandName: string;
+  customColor?: string;
 }
 
 interface ExportOptionsProps {
@@ -19,13 +22,23 @@ interface ExportOptionsProps {
   className?: string;
 }
 
+const PRESET_COLORS = [
+  "#000000", "#FFFFFF", "#FF0000", "#00FF00", "#0000FF", 
+  "#FFFF00", "#FF00FF", "#00FFFF", "#FFA500", "#800080",
+  "#008000", "#800000", "#008080", "#000080", "#FFC0CB",
+  "#A52A2A", "#808080", "#C0C0C0", "#FFD700", "#4B0082"
+];
+
 const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) => {
   const [settings, setSettings] = useState<ExportSettings>({
     formats: ['PNG', 'SVG'],
     colors: ['Original', 'Black', 'White'],
     resolutions: ['72dpi', '300dpi'],
     brandName: 'Brand',
+    customColor: '',
   });
+
+  const [colorPickerOpen, setColorPickerOpen] = useState(false);
 
   const updateSettings = (key: keyof ExportSettings, value: any) => {
     const newSettings = { ...settings, [key]: value };
@@ -44,6 +57,20 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
 
   const isSelected = (key: keyof ExportSettings, option: string) => {
     return (settings[key] as string[]).includes(option);
+  };
+
+  const handleCustomColor = (color: string) => {
+    const isAlreadySelected = isSelected('colors', 'Custom');
+    
+    // Update the custom color
+    updateSettings('customColor', color);
+    
+    // Make sure "Custom" is selected in the colors array
+    if (!isAlreadySelected) {
+      updateSettings('colors', [...settings.colors, 'Custom']);
+    }
+    
+    setColorPickerOpen(false);
   };
 
   return (
@@ -151,6 +178,75 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
               isSelected={isSelected('colors', 'Inverted')}
               onClick={() => toggleOption('colors', 'Inverted')}
             />
+            
+            <Popover open={colorPickerOpen} onOpenChange={setColorPickerOpen}>
+              <PopoverTrigger asChild>
+                <div>
+                  <ColorOption 
+                    label="Custom Color" 
+                    colorPreview={settings.customColor || ''}
+                    isSelected={isSelected('colors', 'Custom')}
+                    onClick={() => setColorPickerOpen(true)}
+                    isCustom
+                  />
+                </div>
+              </PopoverTrigger>
+              <PopoverContent className="w-80">
+                <div className="space-y-4">
+                  <h3 className="font-medium flex items-center">
+                    <Palette className="w-4 h-4 mr-2 text-primary" />
+                    Custom Color
+                  </h3>
+                  
+                  <div>
+                    <Input 
+                      type="color"
+                      value={settings.customColor || '#000000'}
+                      onChange={(e) => handleCustomColor(e.target.value)}
+                      className="h-12 p-1 cursor-pointer w-full"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium">Hex Color</div>
+                    <div className="flex space-x-2">
+                      <Input 
+                        value={settings.customColor || '#000000'}
+                        onChange={(e) => handleCustomColor(e.target.value)}
+                        placeholder="#000000"
+                        className="flex-grow"
+                      />
+                      <button 
+                        className="w-10 h-10 rounded-md border"
+                        style={{ backgroundColor: settings.customColor || '#000000' }}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div className="text-sm font-medium mb-2">Presets</div>
+                    <div className="grid grid-cols-10 gap-1">
+                      {PRESET_COLORS.map((color) => (
+                        <button
+                          key={color}
+                          className={cn(
+                            "w-6 h-6 rounded-md border hover:scale-110 transition-transform",
+                            settings.customColor === color && "ring-2 ring-primary ring-offset-2"
+                          )}
+                          style={{ backgroundColor: color }}
+                          onClick={() => handleCustomColor(color)}
+                          title={color}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+          
+          <div className="mt-6 text-sm text-muted-foreground">
+            <p>Select one or more color variations to include in your export package.</p>
           </div>
         </TabsContent>
         

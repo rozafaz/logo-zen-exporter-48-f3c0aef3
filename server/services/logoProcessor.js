@@ -1,3 +1,4 @@
+
 const fs = require('fs').promises;
 const os = require('os');
 const path = require('path');
@@ -29,7 +30,7 @@ async function checkInkscapeAvailability() {
  * Process a logo SVG into multiple formats, colors, and resolutions.
  */
 exports.processLogoFile = async (filePath, fileName, fileType, settings) => {
-  const { formats, colors, resolutions, brandName } = settings;
+  const { formats, colors, resolutions, brandName, customColor } = settings;
   const outputFiles = [];
 
   // Only SVG inputs
@@ -44,7 +45,19 @@ exports.processLogoFile = async (filePath, fileName, fileType, settings) => {
     throw new Error('Invalid SVG: malformed XML');
   }
 
-  for (const color of colors) {
+  // Process color variants, including custom color if selected
+  const colorVariants = [...colors];
+  if (colors.includes('Custom') && customColor) {
+    // Replace 'Custom' with the actual color value
+    const customIndex = colorVariants.indexOf('Custom');
+    if (customIndex >= 0) {
+      colorVariants[customIndex] = customColor;
+    } else {
+      colorVariants.push(customColor);
+    }
+  }
+
+  for (const color of colorVariants) {
     console.log(`Processing color variation: ${color}`);
     const transformedSvg = transformSvgColor(svgText, color);
     const tempPath = await writeTempFile(transformedSvg, 'svg');
@@ -115,6 +128,11 @@ async function writeTempFile(content, ext) {
 }
 
 function transformSvgColor(svgText, color) {
+  // Handle hex color values (custom colors)
+  if (color.startsWith('#')) {
+    return applyCustomHexColor(svgText, color);
+  }
+
   const $ = cheerio.load(svgText, { xmlMode: true });
   const root = $('svg').first();
   if (!root.length) return svgText;
@@ -159,4 +177,61 @@ function transformSvgColor(svgText, color) {
   root.append(wrapper);
 
   return $.xml();
+}
+
+function applyCustomHexColor(svgText, hexColor) {
+  try {
+    console.log(`Applying custom hex color: ${hexColor}`);
+    const $ = cheerio.load(svgText, { xmlMode: true });
+    
+    // Apply the hex color to all visual elements
+    $('path, rect, circle, ellipse, line, polyline, polygon, text, tspan').each((i, el) => {
+      const $el = $(el);
+      if ($el.attr('fill') && $el.attr('fill') !== 'none') {
+        $el.attr('fill', hexColor);
+      }
+      if ($el.attr('stroke') && $el.attr('stroke') !== 'none') {
+        $el.attr('stroke', hexColor);
+      }
+      
+      // If no fill or stroke is defined, add fill
+      if (!$el.attr('fill') && !$el.attr('stroke')) {
+        $el.attr('fill', hexColor);
+      }
+    });
+    
+    // Apply to groups that might have fills
+    $('g').each((i, el) => {
+      const $el = $(el);
+      if ($el.attr('fill') && $el.attr('fill') !== 'none') {
+        $el.attr('fill', hexColor);
+      }
+      if ($el.attr('stroke') && $el.attr('stroke') !== 'none') {
+        $el.attr('stroke', hexColor);
+      }
+    });
+    
+    // Remove any style blocks that might override our color
+    $('style').each((i, el) => {
+      $(el).remove();
+    });
+    
+    // Remove any gradients
+    $('linearGradient, radialGradient, pattern').each((i, el) => {
+      const id = $(el).attr('id');
+      if (id) {
+        $(`[fill="url(#${id})"], [stroke="url(#${id})"]`).each((i, userEl) => {
+          $(userEl).attr('fill', hexColor);
+          if ($(userEl).attr('stroke') && $(userEl).attr('stroke').includes(`url(#${id})`)) {
+            $(userEl).attr('stroke', hexColor);
+          }
+        });
+      }
+    });
+    
+    return $.xml();
+  } catch (error) {
+    console.error('Error applying custom hex color:', error);
+    return svgText;
+  }
 }
