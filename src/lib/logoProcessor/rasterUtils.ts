@@ -150,52 +150,5 @@ export const applyColorFilter = (
     applyGrayscaleFilter(ctx, width, height);
   } else if (color === 'Inverted' && colors.includes('Inverted')) {
     applyInvertedFilter(ctx, width, height);
-  } else if (color.startsWith('#')) {
-    // Apply custom color filter for hex colors
-    applyCustomColorFilter(ctx, width, height, color);
-  }
-};
-
-/**
- * Apply a custom color filter based on a hex color value
- */
-export const applyCustomColorFilter = (
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-  hexColor: string
-): void => {
-  try {
-    // Convert hex to RGB
-    const r = parseInt(hexColor.slice(1, 3), 16);
-    const g = parseInt(hexColor.slice(3, 5), 16);
-    const b = parseInt(hexColor.slice(5, 7), 16);
-    
-    console.log(`Applying custom color filter: ${hexColor} (${r},${g},${b})`);
-    
-    const imageData = ctx.getImageData(0, 0, width, height);
-    const data = imageData.data;
-    
-    // First convert to grayscale then apply the color
-    for (let i = 0; i < data.length; i += 4) {
-      // Skip fully transparent pixels
-      if (data[i + 3] === 0) continue;
-      
-      // Calculate grayscale value (luminance)
-      const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-      
-      // Calculate color saturation level based on original alpha
-      const saturation = data[i + 3] / 255;
-      
-      // Apply the new color while preserving luminance
-      data[i] = r * (gray / 255) * saturation;     // red
-      data[i + 1] = g * (gray / 255) * saturation; // green
-      data[i + 2] = b * (gray / 255) * saturation; // blue
-      // Alpha remains unchanged
-    }
-    
-    ctx.putImageData(imageData, 0, 0);
-  } catch (error) {
-    console.error('Error applying custom color:', error);
   }
 };

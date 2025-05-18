@@ -1,4 +1,3 @@
-
 const path = require('path');
 const fs = require('fs').promises;
 const JSZip = require('jszip');
@@ -17,17 +16,6 @@ exports.processLogo = async (req, res) => {
 
     const settings = JSON.parse(req.body.settings);
     console.log('Processing with settings:', settings);
-
-    // Handle custom color
-    if (settings.colors.includes('Custom') && settings.customColor) {
-      console.log(`Found custom color: ${settings.customColor}`);
-      
-      // Validate custom color format (should be a valid hex color)
-      if (!/^#[0-9A-Fa-f]{6}$/.test(settings.customColor)) {
-        console.warn(`Invalid custom color format: ${settings.customColor}`);
-        settings.customColor = '#000000'; // Default to black if invalid
-      }
-    }
 
     const { path: filePath, originalname: fileName, mimetype: fileType } = req.file;
 

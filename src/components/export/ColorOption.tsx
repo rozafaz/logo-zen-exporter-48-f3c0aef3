@@ -8,11 +8,10 @@ interface ColorOptionProps {
   colorPreview: string;
   isSelected: boolean;
   onClick: () => void;
-  isCustom?: boolean;
 }
 
 const ColorOption: React.FC<ColorOptionProps> = ({
-  label, colorPreview, isSelected, onClick, isCustom = false
+  label, colorPreview, isSelected, onClick
 }) => (
   <button
     className={cn(
@@ -24,13 +23,10 @@ const ColorOption: React.FC<ColorOptionProps> = ({
     onClick={onClick}
   >
     <div 
-      className={cn(
-        "w-8 h-8 rounded-full mr-3",
-        isCustom && !colorPreview && "bg-gradient-to-r from-red-500 via-green-500 to-blue-500"
-      )}
+      className="w-8 h-8 rounded-full mr-3"
       style={{ 
-        backgroundColor: colorPreview || undefined,
-        boxShadow: (colorPreview === '#FFFFFF' || colorPreview === '') 
+        backgroundColor: colorPreview,
+        boxShadow: colorPreview === '#FFFFFF' 
           ? 'inset 0 0 0 1px rgba(0,0,0,0.1)' 
           : 'none'
       }}
@@ -50,7 +46,6 @@ const ColorOption: React.FC<ColorOptionProps> = ({
     </div>
     <div className="text-left">
       <div className="font-medium text-sm">{label}</div>
-      {isCustom && <div className="text-xs text-muted-foreground">{colorPreview || "Select color"}</div>}
     </div>
   </button>
 );

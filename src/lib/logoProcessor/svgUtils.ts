@@ -1,4 +1,3 @@
-
 import { modifySvgColor, invertSvgColors } from './colorUtils';
 import type { ProcessedFile } from './types';
 
@@ -62,13 +61,6 @@ export const applyColorToSvg = (
   } else if (color === 'Inverted' && colors.includes('Inverted')) {
     console.log('Inverting SVG colors');
     modifiedSvg = invertSvgColors(modifiedSvg);
-  } else if (color === 'Custom' && colors.includes('Custom')) {
-    // Find the custom color from settings
-    const customColor = colors.find(c => c.startsWith('#'));
-    if (customColor) {
-      console.log(`Applying custom color ${customColor} to SVG elements`);
-      modifiedSvg = modifySvgColor(modifiedSvg, customColor);
-    }
   } else if (color === 'original') {
     // Keep original colors
     console.log('Keeping original SVG colors');
