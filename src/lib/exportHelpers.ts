@@ -3,8 +3,7 @@ import type { ExportSettings } from '@/components/ExportOptions';
 import { toast } from 'sonner';
 
 // Backend API URL (update this based on your deployment)
-const API_URL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000';
-
+const API_URL = 'http://localhost:3000';
 /**
  * Check if the server is running and Inkscape is available
  */
