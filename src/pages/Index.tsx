@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import Header from '@/components/Header';
@@ -15,9 +14,11 @@ const Index = () => {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [exportSettings, setExportSettings] = useState<ExportSettings>({
     formats: ['PNG', 'SVG'],
-    colors: ['Original', 'Black', 'White'],
-    resolutions: ['72dpi', '300dpi'],
+    colors: ['RGB'],
+    resolutions: ['300dpi'],
     brandName: 'Brand',
+    backgroundHandling: 'transparent',
+    backgroundColor: '#ffffff'
   });
 
   const handleLogoUpload = (file: File, preview: string) => {
