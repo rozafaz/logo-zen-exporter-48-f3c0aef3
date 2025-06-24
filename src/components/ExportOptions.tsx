@@ -1,17 +1,19 @@
 
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { File, Image } from 'lucide-react';
+import { File, Image, Circle, CheckCircle2 } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import FormatOption from './export/FormatOption';
-import ResolutionOption from './export/ResolutionOption';
-import ColorOption from './export/ColorOption';
+import ColorPicker from './export/ColorPicker';
 
 export interface ExportSettings {
   formats: string[];
   colors: string[];
   resolutions: string[];
   brandName: string;
+  backgroundHandling: 'transparent' | 'remove' | 'replace';
+  backgroundColor?: string;
 }
 
 interface ExportOptionsProps {
@@ -22,9 +24,11 @@ interface ExportOptionsProps {
 const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) => {
   const [settings, setSettings] = useState<ExportSettings>({
     formats: ['PNG', 'SVG'],
-    colors: ['Original', 'Black', 'White'],
-    resolutions: ['72dpi', '300dpi'],
+    colors: ['RGB'],
+    resolutions: ['300dpi'],
     brandName: 'Brand',
+    backgroundHandling: 'transparent',
+    backgroundColor: '#ffffff'
   });
 
   const updateSettings = (key: keyof ExportSettings, value: any) => {
@@ -33,154 +37,188 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
     onChange(newSettings);
   };
 
-  const toggleOption = (key: keyof ExportSettings, option: string) => {
-    const currentOptions = settings[key] as string[];
-    if (currentOptions.includes(option)) {
-      updateSettings(key, currentOptions.filter(item => item !== option));
+  const toggleFormat = (format: string) => {
+    const currentFormats = settings.formats;
+    if (currentFormats.includes(format)) {
+      updateSettings('formats', currentFormats.filter(item => item !== format));
     } else {
-      updateSettings(key, [...currentOptions, option]);
+      updateSettings('formats', [...currentFormats, format]);
     }
   };
 
-  const isSelected = (key: keyof ExportSettings, option: string) => {
-    return (settings[key] as string[]).includes(option);
+  const isFormatSelected = (format: string) => {
+    return settings.formats.includes(format);
   };
 
+  const isPngSelected = () => settings.formats.includes('PNG');
+  const isVectorSelected = () => settings.formats.some(f => ['SVG', 'EPS', 'PDF'].includes(f));
+
   return (
-    <div className={cn('rounded-xl glass-panel p-1 animate-fade-in', className)}>
-      <Tabs defaultValue="formats" className="w-full">
-        <TabsList className="w-full grid grid-cols-3 mb-2">
-          <TabsTrigger value="formats" className="text-sm">Formats</TabsTrigger>
-          <TabsTrigger value="colors" className="text-sm">Colors</TabsTrigger>
-          <TabsTrigger value="naming" className="text-sm">Naming</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="formats" className="p-4 pt-2">
-          <h3 className="font-medium mb-3">Export Formats</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            <FormatOption 
-              icon={<Image className="w-4 h-4" />}
-              label="PNG" 
-              description="Raster with transparency"
-              isSelected={isSelected('formats', 'PNG')}
-              onClick={() => toggleOption('formats', 'PNG')} 
-            />
-            <FormatOption 
-              icon={<File className="w-4 h-4" />}
-              label="SVG" 
-              description="Vector format"
-              isSelected={isSelected('formats', 'SVG')}
-              onClick={() => toggleOption('formats', 'SVG')}
-            />
-            <FormatOption 
-              icon={<File className="w-4 h-4" />}
-              label="EPS" 
-              description="Professional print"
-              isSelected={isSelected('formats', 'EPS')}
-              onClick={() => toggleOption('formats', 'EPS')}
-            />
-            <FormatOption 
-              icon={<File className="w-4 h-4" />}
-              label="PDF" 
-              description="Vector document"
-              isSelected={isSelected('formats', 'PDF')}
-              onClick={() => toggleOption('formats', 'PDF')}
-            />
-            <FormatOption 
-              icon={<Image className="w-4 h-4" />}
-              label="ICO" 
-              description="Favicon format"
-              isSelected={isSelected('formats', 'ICO')}
-              onClick={() => toggleOption('formats', 'ICO')}
-            />
-          </div>
+    <div className={cn('rounded-xl glass-panel p-6 space-y-8 animate-fade-in', className)}>
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-bold">Export Settings</h2>
+        <p className="text-muted-foreground mt-1">Configure your logo export options</p>
+      </div>
+
+      {/* Section 1: Upload Info */}
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold border-b border-border pb-2">Upload</h3>
+        <div className="bg-secondary/30 rounded-lg p-4">
+          <h4 className="font-medium mb-2">Supported Inputs</h4>
+          <ul className="text-sm space-y-1 text-muted-foreground">
+            <li>• File types (vector only): .ai, .svg, .eps, .pdf</li>
+            <li>• Any artboard or object dimensions</li>
+            <li>• Any background (solid, gradient, texture, embedded imagery)</li>
+          </ul>
+        </div>
+      </div>
+
+      {/* Section 2: Output Format */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold border-b border-border pb-2">Output Format</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <FormatOption 
+            icon={<File className="w-4 h-4" />}
+            label="SVG" 
+            description="Vector format"
+            isSelected={isFormatSelected('SVG')}
+            onClick={() => toggleFormat('SVG')}
+          />
+          <FormatOption 
+            icon={<File className="w-4 h-4" />}
+            label="EPS" 
+            description="Vector format"
+            isSelected={isFormatSelected('EPS')}
+            onClick={() => toggleFormat('EPS')}
+          />
+          <FormatOption 
+            icon={<File className="w-4 h-4" />}
+            label="PDF" 
+            description="Vector format"
+            isSelected={isFormatSelected('PDF')}
+            onClick={() => toggleFormat('PDF')}
+          />
+          <FormatOption 
+            icon={<Image className="w-4 h-4" />}
+            label="PNG" 
+            description="Raster format"
+            isSelected={isFormatSelected('PNG')}
+            onClick={() => toggleFormat('PNG')} 
+          />
+        </div>
+      </div>
+
+      {/* Section 3: Resolution (Only when PNG selected) */}
+      {isPngSelected() && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold border-b border-border pb-2">Resolution</h3>
+          <RadioGroup 
+            value={settings.resolutions[0]} 
+            onValueChange={(value) => updateSettings('resolutions', [value])}
+            className="space-y-3"
+          >
+            <div className="flex items-center space-x-3">
+              <RadioGroupItem value="72dpi" id="72dpi" />
+              <Label htmlFor="72dpi" className="flex-1">
+                <div className="font-medium">Low (72 dpi)</div>
+                <div className="text-sm text-muted-foreground">Web & on-screen</div>
+              </Label>
+            </div>
+            <div className="flex items-center space-x-3">
+              <RadioGroupItem value="150dpi" id="150dpi" />
+              <Label htmlFor="150dpi" className="flex-1">
+                <div className="font-medium">Medium (150 dpi)</div>
+                <div className="text-sm text-muted-foreground">Social & docs</div>
+              </Label>
+            </div>
+            <div className="flex items-center space-x-3">
+              <RadioGroupItem value="300dpi" id="300dpi" />
+              <Label htmlFor="300dpi" className="flex-1">
+                <div className="font-medium">High (300 dpi)</div>
+                <div className="text-sm text-muted-foreground">Print & signage</div>
+              </Label>
+            </div>
+          </RadioGroup>
+        </div>
+      )}
+
+      {/* Section 4: Color Model (Only for PNG, SVG, EPS) */}
+      {(isPngSelected() || isVectorSelected()) && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold border-b border-border pb-2">Color Model</h3>
+          <RadioGroup 
+            value={settings.colors[0]} 
+            onValueChange={(value) => updateSettings('colors', [value])}
+            className="space-y-3"
+          >
+            <div className="flex items-center space-x-3">
+              <RadioGroupItem value="RGB" id="rgb" />
+              <Label htmlFor="rgb" className="flex-1">
+                <div className="font-medium">RGB</div>
+                <div className="text-sm text-muted-foreground">Full-color for screens</div>
+              </Label>
+            </div>
+            <div className="flex items-center space-x-3">
+              <RadioGroupItem value="Grayscale" id="grayscale" />
+              <Label htmlFor="grayscale" className="flex-1">
+                <div className="font-medium">Grayscale</div>
+                <div className="text-sm text-muted-foreground">Monochrome applications</div>
+              </Label>
+            </div>
+            <div className="flex items-center space-x-3">
+              <RadioGroupItem value="Inverted" id="inverted" />
+              <Label htmlFor="inverted" className="flex-1">
+                <div className="font-medium">Inverted</div>
+                <div className="text-sm text-muted-foreground">Reverse tonal palette</div>
+              </Label>
+            </div>
+          </RadioGroup>
+        </div>
+      )}
+
+      {/* Section 5: Background Handling (For raster and vector with transparency) */}
+      {(isPngSelected() || isVectorSelected()) && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold border-b border-border pb-2">Background</h3>
+          <RadioGroup 
+            value={settings.backgroundHandling} 
+            onValueChange={(value: 'transparent' | 'remove' | 'replace') => updateSettings('backgroundHandling', value)}
+            className="space-y-3"
+          >
+            <div className="flex items-center space-x-3">
+              <RadioGroupItem value="transparent" id="transparent" />
+              <Label htmlFor="transparent" className="flex-1">
+                <div className="font-medium">Keep Transparency</div>
+                <div className="text-sm text-muted-foreground">Preserve as-is</div>
+              </Label>
+            </div>
+            <div className="flex items-center space-x-3">
+              <RadioGroupItem value="remove" id="remove" />
+              <Label htmlFor="remove" className="flex-1">
+                <div className="font-medium">Remove Background</div>
+                <div className="text-sm text-muted-foreground">Auto-detect & strip</div>
+              </Label>
+            </div>
+            <div className="flex items-center space-x-3">
+              <RadioGroupItem value="replace" id="replace" />
+              <Label htmlFor="replace" className="flex-1">
+                <div className="font-medium">Replace Background</div>
+                <div className="text-sm text-muted-foreground">Apply color/gradient</div>
+              </Label>
+            </div>
+          </RadioGroup>
           
-          <h3 className="font-medium mt-6 mb-3">Resolutions</h3>
-          <div className="flex flex-wrap gap-2">
-            <ResolutionOption 
-              label="72dpi" 
-              description="Web/Screen"
-              isSelected={isSelected('resolutions', '72dpi')}
-              onClick={() => toggleOption('resolutions', '72dpi')}
-            />
-            <ResolutionOption 
-              label="150dpi" 
-              description="Medium quality"
-              isSelected={isSelected('resolutions', '150dpi')}
-              onClick={() => toggleOption('resolutions', '150dpi')}
-            />
-            <ResolutionOption 
-              label="300dpi" 
-              description="Print quality"
-              isSelected={isSelected('resolutions', '300dpi')}
-              onClick={() => toggleOption('resolutions', '300dpi')}
-            />
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="colors" className="p-4 pt-2">
-          <h3 className="font-medium mb-3">Color Variations</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            <ColorOption 
-              label="Original" 
-              colorPreview="#3B82F6"
-              isSelected={isSelected('colors', 'Original')}
-              onClick={() => toggleOption('colors', 'Original')}
-            />
-            <ColorOption 
-              label="Black" 
-              colorPreview="#000000"
-              isSelected={isSelected('colors', 'Black')}
-              onClick={() => toggleOption('colors', 'Black')}
-            />
-            <ColorOption 
-              label="White" 
-              colorPreview="#FFFFFF"
-              isSelected={isSelected('colors', 'White')}
-              onClick={() => toggleOption('colors', 'White')}
-            />
-            <ColorOption 
-              label="Grayscale" 
-              colorPreview="#888888"
-              isSelected={isSelected('colors', 'Grayscale')}
-              onClick={() => toggleOption('colors', 'Grayscale')}
-            />
-            <ColorOption 
-              label="Inverted" 
-              colorPreview="#DDDDDD"
-              isSelected={isSelected('colors', 'Inverted')}
-              onClick={() => toggleOption('colors', 'Inverted')}
-            />
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="naming" className="p-4 pt-2">
-          <h3 className="font-medium mb-3">Brand Information</h3>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Brand Name
-              </label>
-              <input 
-                type="text"
-                value={settings.brandName}
-                onChange={(e) => updateSettings('brandName', e.target.value)}
-                className="w-full px-3 py-2 rounded-md border border-input focus:outline-none focus:ring-2 focus:ring-ring"
-                placeholder="Enter your brand name"
+          {/* Color picker for background replacement */}
+          {settings.backgroundHandling === 'replace' && (
+            <div className="ml-6 mt-3">
+              <ColorPicker 
+                value={settings.backgroundColor || '#ffffff'}
+                onChange={(color) => updateSettings('backgroundColor', color)}
               />
             </div>
-            
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Naming Preview
-              </label>
-              <div className="bg-secondary p-3 rounded-md text-sm font-mono overflow-x-auto">
-                {settings.brandName || 'Brand'}_Primary_RGB_300dpi.png
-              </div>
-            </div>
-          </div>
-        </TabsContent>
-      </Tabs>
+          )}
+        </div>
+      )}
     </div>
   );
 };

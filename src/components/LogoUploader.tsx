@@ -39,15 +39,22 @@ const LogoUploader: React.FC<LogoUploaderProps> = ({ onLogoUpload, className }) 
   };
 
   const handleFile = (file: File) => {
-    // Check if file is an image
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please upload an image file.');
+    // Check if file is a supported vector format
+    const supportedTypes = [
+      'application/pdf',
+      'application/postscript',
+      'application/illustrator',
+      'image/svg+xml'
+    ];
+    
+    if (!supportedTypes.includes(file.type) && !file.name.toLowerCase().endsWith('.ai') && !file.name.toLowerCase().endsWith('.eps')) {
+      toast.error('Please upload a vector file (.ai, .svg, .eps, .pdf).');
       return;
     }
 
-    // Check if file is less than 5MB
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('File is too large. Please upload a file smaller than 5MB.');
+    // Check if file is less than 10MB (increased for vector files)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File is too large. Please upload a file smaller than 10MB.');
       return;
     }
 
@@ -107,11 +114,11 @@ const LogoUploader: React.FC<LogoUploaderProps> = ({ onLogoUpload, className }) 
         )}
         
         <div className="text-center">
-          <h3 className="text-lg font-semibold">{preview ? 'Logo Uploaded' : 'Upload Your Logo'}</h3>
+          <h3 className="text-lg font-semibold">{preview ? 'Vector File Uploaded' : 'Upload Your Vector Logo'}</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             {preview 
-              ? 'Your logo is ready for export.' 
-              : 'Drag and drop your logo file here, or click to browse.'}
+              ? 'Your vector logo is ready for export.' 
+              : 'Drag and drop your vector file here, or click to browse.'}
           </p>
         </div>
 
@@ -119,7 +126,7 @@ const LogoUploader: React.FC<LogoUploaderProps> = ({ onLogoUpload, className }) 
           type="file"
           ref={fileInputRef}
           onChange={handleFileChange}
-          accept="image/*"
+          accept="application/pdf,application/postscript,application/illustrator,image/svg+xml,.ai,.eps"
           className="hidden"
         />
 
@@ -145,7 +152,7 @@ const LogoUploader: React.FC<LogoUploaderProps> = ({ onLogoUpload, className }) 
         </div>
         
         <div className="text-xs text-muted-foreground mt-2">
-          Supported formats: SVG, PNG, JPG (Max: 5MB)
+          Supported formats: AI, SVG, EPS, PDF (Max: 10MB)
         </div>
       </div>
     </div>
