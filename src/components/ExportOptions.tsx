@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { File, Image, Circle, CheckCircle2 } from 'lucide-react';
+import { File, Image, Palette, Sun, Moon, RotateCcw, Square, CircleDot } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import FormatOption from './export/FormatOption';
@@ -25,7 +25,7 @@ interface ExportOptionsProps {
 const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) => {
   const [settings, setSettings] = useState<ExportSettings>({
     formats: ['PNG', 'SVG'],
-    colors: ['RGB'],
+    colors: [],
     resolutions: ['300dpi'],
     brandName: 'Brand',
     backgroundHandling: 'transparent',
@@ -163,42 +163,35 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
           <h3 className="text-lg font-semibold border-b border-border pb-2">Color Model</h3>
           <div className="grid grid-cols-2 gap-3">
             <FormatOption 
-              icon={<Circle className="w-4 h-4" />}
-              label="RGB" 
-              description="Full-color for screens"
-              isSelected={isColorSelected('RGB')}
-              onClick={() => toggleColor('RGB')}
-            />
-            <FormatOption 
-              icon={<Circle className="w-4 h-4" />}
-              label="Grayscale" 
-              description="Monochrome applications"
-              isSelected={isColorSelected('Grayscale')}
-              onClick={() => toggleColor('Grayscale')}
-            />
-            <FormatOption 
-              icon={<Circle className="w-4 h-4" />}
-              label="Inverted" 
-              description="Reverse tonal palette"
-              isSelected={isColorSelected('Inverted')}
-              onClick={() => toggleColor('Inverted')}
-            />
-            <FormatOption 
-              icon={<Circle className="w-4 h-4" />}
+              icon={<Square className="w-4 h-4 fill-black" />}
               label="Black" 
               description="Pure black version"
               isSelected={isColorSelected('Black')}
               onClick={() => toggleColor('Black')}
             />
             <FormatOption 
-              icon={<Circle className="w-4 h-4" />}
+              icon={<Square className="w-4 h-4 fill-white stroke-gray-400" />}
               label="White" 
               description="Pure white version"
               isSelected={isColorSelected('White')}
               onClick={() => toggleColor('White')}
             />
             <FormatOption 
-              icon={<Circle className="w-4 h-4" />}
+              icon={<CircleDot className="w-4 h-4" />}
+              label="Grayscale" 
+              description="Monochrome applications"
+              isSelected={isColorSelected('Grayscale')}
+              onClick={() => toggleColor('Grayscale')}
+            />
+            <FormatOption 
+              icon={<RotateCcw className="w-4 h-4" />}
+              label="Inverted" 
+              description="Reverse tonal palette"
+              isSelected={isColorSelected('Inverted')}
+              onClick={() => toggleColor('Inverted')}
+            />
+            <FormatOption 
+              icon={<Palette className="w-4 h-4" />}
               label="Custom Color" 
               description="Choose your own color"
               isSelected={isColorSelected('Custom')}

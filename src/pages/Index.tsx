@@ -14,7 +14,7 @@ const Index = () => {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [exportSettings, setExportSettings] = useState<ExportSettings>({
     formats: ['PNG', 'SVG'],
-    colors: ['RGB'],
+    colors: [],
     resolutions: ['300dpi'],
     brandName: 'Brand',
     backgroundHandling: 'transparent',
