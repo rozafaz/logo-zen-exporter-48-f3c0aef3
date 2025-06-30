@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { File, Image, Palette, Sun, Moon, RotateCcw, Square, CircleDot, Pipette } from 'lucide-react';
+import { File, Image, Palette, Sun, Moon, RotateCcw, Square, CircleDot, Pipette, Eye } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import FormatOption from './export/FormatOption';
@@ -31,6 +31,8 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
     backgroundColor: '#ffffff',
     customColor: '#000000'
   });
+
+  const [showCustomColorPicker, setShowCustomColorPicker] = useState(false);
 
   const updateSettings = (key: keyof ExportSettings, value: any) => {
     const newSettings = { ...settings, [key]: value };
@@ -193,47 +195,80 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
             />
           </div>
           
-          {/* Custom Color Section */}
-          <div className="mt-6">
-            <h4 className="text-base font-medium mb-4">Custom Color</h4>
+          {/* Modern Custom Color Section */}
+          <div className="mt-8">
+            <h4 className="text-base font-semibold mb-4 flex items-center gap-2">
+              <Palette className="w-4 h-4 text-primary" />
+              Custom Color
+            </h4>
             
-            <div className="bg-secondary/20 border border-border/50 rounded-xl p-6 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-3">
+            <div className="bg-gradient-to-br from-secondary/40 to-secondary/20 border border-border/60 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-4">
+                  <div className="relative group">
                     <button
-                      onClick={() => toggleColor('Custom')}
+                      onClick={() => {
+                        setShowCustomColorPicker(!showCustomColorPicker);
+                        if (!isColorSelected('Custom')) {
+                          toggleColor('Custom');
+                        }
+                      }}
                       className={cn(
-                        "relative w-12 h-12 rounded-lg border-2 cursor-pointer transition-all duration-200 group",
+                        "relative w-16 h-16 rounded-xl border-3 cursor-pointer transition-all duration-300 group shadow-lg hover:shadow-xl",
                         isColorSelected('Custom') 
-                          ? "border-primary ring-2 ring-primary/20" 
-                          : "border-border hover:border-primary/50"
+                          ? "border-primary ring-4 ring-primary/20 scale-105" 
+                          : "border-border/50 hover:border-primary/60 hover:scale-105"
                       )}
                       style={{ backgroundColor: settings.customColor || '#000000' }}
-                      title="Click to select custom color"
+                      title="Click to open color picker"
                     >
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Pipette className="w-4 h-4 text-white drop-shadow-lg" />
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 bg-black/10 rounded-xl backdrop-blur-sm">
+                        <Pipette className="w-5 h-5 text-white drop-shadow-lg" />
+                      </div>
+                      <div className="absolute -bottom-2 -right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center shadow-lg">
+                        <Eye className="w-3 h-3 text-primary-foreground" />
                       </div>
                     </button>
-                    <div className="space-y-1">
-                      <Label className="text-sm font-medium">Click color to select</Label>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-foreground/90">Current Color</Label>
+                    <div className="flex items-center gap-2">
                       <input
                         type="text"
                         value={settings.customColor || '#000000'}
                         onChange={(e) => updateSettings('customColor', e.target.value)}
-                        className="w-24 px-2 py-1 text-xs rounded border border-input bg-background focus:outline-none focus:ring-1 focus:ring-ring transition-all"
+                        className="w-28 px-3 py-2 text-sm font-mono rounded-lg border border-input bg-background/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all backdrop-blur-sm"
                         placeholder="#000000"
                       />
+                      <div className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-md">
+                        HEX
+                      </div>
                     </div>
                   </div>
                 </div>
                 
                 {isColorSelected('Custom') && (
-                  <div className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
+                  <div className="flex items-center gap-2 bg-primary/10 text-primary px-3 py-2 rounded-full text-sm font-medium shadow-sm">
+                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
                     Selected
                   </div>
                 )}
+              </div>
+              
+              {/* Color Picker Panel */}
+              {showCustomColorPicker && (
+                <div className="mt-6 p-4 bg-background/60 rounded-xl border border-border/30 backdrop-blur-sm animate-fade-in">
+                  <ColorPicker 
+                    value={settings.customColor || '#000000'}
+                    onChange={(color) => updateSettings('customColor', color)}
+                  />
+                </div>
+              )}
+              
+              <div className="mt-4 text-xs text-muted-foreground flex items-center gap-2">
+                <Pipette className="w-3 h-3" />
+                Click the color swatch to open the advanced picker
               </div>
             </div>
           </div>
