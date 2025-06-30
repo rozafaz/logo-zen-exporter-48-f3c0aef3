@@ -58,6 +58,19 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
     }
   };
 
+  const toggleCustomColor = () => {
+    const isCurrentlySelected = isColorSelected('Custom');
+    if (isCurrentlySelected) {
+      // Unselect custom color
+      updateSettings('colors', settings.colors.filter(item => item !== 'Custom'));
+      setShowCustomColorPicker(false);
+    } else {
+      // Select custom color
+      updateSettings('colors', [...settings.colors, 'Custom']);
+      setShowCustomColorPicker(true);
+    }
+  };
+
   const isFormatSelected = (format: string) => {
     return settings.formats.includes(format);
   };
@@ -195,44 +208,38 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
             />
           </div>
           
-          {/* Modern Custom Color Section */}
+          {/* Custom Color Section */}
           <div className="mt-8">
             <h4 className="text-base font-semibold mb-4 flex items-center gap-2">
               <Palette className="w-4 h-4 text-primary" />
               Custom Color
             </h4>
             
-            <div className="bg-gradient-to-br from-secondary/40 to-secondary/20 border border-border/60 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300">
+            <div className="bg-gradient-to-br from-secondary/50 to-secondary/20 border border-border/60 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-4">
                   <div className="relative group">
                     <button
-                      onClick={() => {
-                        setShowCustomColorPicker(!showCustomColorPicker);
-                        if (!isColorSelected('Custom')) {
-                          toggleColor('Custom');
-                        }
-                      }}
+                      onClick={toggleCustomColor}
                       className={cn(
-                        "relative w-16 h-16 rounded-xl border-3 cursor-pointer transition-all duration-300 group shadow-lg hover:shadow-xl",
+                        "relative w-12 h-12 rounded-xl border-2 cursor-pointer transition-all duration-300 group shadow-md hover:shadow-lg",
                         isColorSelected('Custom') 
                           ? "border-primary ring-4 ring-primary/20 scale-105" 
                           : "border-border/50 hover:border-primary/60 hover:scale-105"
                       )}
                       style={{ backgroundColor: settings.customColor || '#000000' }}
-                      title="Click to open color picker"
+                      title={isColorSelected('Custom') ? "Click to unselect custom color" : "Click to select custom color"}
                     >
                       <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 bg-black/10 rounded-xl backdrop-blur-sm">
-                        <Pipette className="w-5 h-5 text-white drop-shadow-lg" />
-                      </div>
-                      <div className="absolute -bottom-2 -right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center shadow-lg">
-                        <Eye className="w-3 h-3 text-primary-foreground" />
+                        <Pipette className="w-4 h-4 text-white drop-shadow-lg" />
                       </div>
                     </button>
                   </div>
                   
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-foreground/90">Current Color</Label>
+                    <Label className="text-sm font-medium text-foreground/90">
+                      {isColorSelected('Custom') ? 'Selected Color' : 'Custom Color'}
+                    </Label>
                     <div className="flex items-center gap-2">
                       <input
                         type="text"
@@ -257,7 +264,7 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
               </div>
               
               {/* Color Picker Panel */}
-              {showCustomColorPicker && (
+              {showCustomColorPicker && isColorSelected('Custom') && (
                 <div className="mt-6 p-4 bg-background/60 rounded-xl border border-border/30 backdrop-blur-sm animate-fade-in">
                   <ColorPicker 
                     value={settings.customColor || '#000000'}
@@ -268,7 +275,10 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
               
               <div className="mt-4 text-xs text-muted-foreground flex items-center gap-2">
                 <Pipette className="w-3 h-3" />
-                Click the color swatch to open the advanced picker
+                {isColorSelected('Custom') 
+                  ? 'Click the color swatch to unselect or open the picker'
+                  : 'Click the color swatch to select this custom color'
+                }
               </div>
             </div>
           </div>
