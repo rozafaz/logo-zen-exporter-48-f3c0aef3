@@ -1,10 +1,11 @@
+
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { File, Image, Palette, Sun, Moon, RotateCcw, Square, CircleDot, Pipette, Eye } from 'lucide-react';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
-import FormatOption from './export/FormatOption';
-import ColorPicker from './export/ColorPicker';
+import UploadInfo from './export/UploadInfo';
+import OutputFormat from './export/OutputFormat';
+import ResolutionSelector from './export/ResolutionSelector';
+import ColorModelSelector from './export/ColorModelSelector';
+import BackgroundSelector from './export/BackgroundSelector';
 
 export interface ExportSettings {
   formats: string[];
@@ -32,8 +33,6 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
     customColor: '#000000'
   });
 
-  const [showCustomColorPicker, setShowCustomColorPicker] = useState(false);
-
   const updateSettings = (key: keyof ExportSettings, value: any) => {
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
@@ -58,27 +57,6 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
     }
   };
 
-  const toggleCustomColor = () => {
-    const isCurrentlySelected = isColorSelected('Custom');
-    if (isCurrentlySelected) {
-      // Unselect custom color
-      updateSettings('colors', settings.colors.filter(item => item !== 'Custom'));
-      setShowCustomColorPicker(false);
-    } else {
-      // Select custom color
-      updateSettings('colors', [...settings.colors, 'Custom']);
-      setShowCustomColorPicker(true);
-    }
-  };
-
-  const isFormatSelected = (format: string) => {
-    return settings.formats.includes(format);
-  };
-
-  const isColorSelected = (color: string) => {
-    return settings.colors.includes(color);
-  };
-
   const isPngSelected = () => settings.formats.includes('PNG');
   const isVectorSelected = () => settings.formats.some(f => ['SVG', 'EPS', 'PDF'].includes(f));
 
@@ -90,243 +68,40 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
       </div>
 
       {/* Section 1: Upload Info */}
-      <div className="space-y-3">
-        <h3 className="text-lg font-semibold border-b border-border pb-2">Upload</h3>
-        <div className="bg-secondary/30 rounded-lg p-4">
-          <h4 className="font-medium mb-2">Supported Inputs</h4>
-          <ul className="text-sm space-y-1 text-muted-foreground">
-            <li>• File types (vector only): .ai, .svg, .eps, .pdf</li>
-            <li>• Any artboard or object dimensions</li>
-            <li>• Any background (solid, gradient, texture, embedded imagery)</li>
-          </ul>
-        </div>
-      </div>
+      <UploadInfo />
 
       {/* Section 2: Output Format */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold border-b border-border pb-2">Output Format</h3>
-        <div className="grid grid-cols-2 gap-3">
-          <FormatOption 
-            icon={<File className="w-4 h-4" />}
-            label="SVG" 
-            description="Vector format"
-            isSelected={isFormatSelected('SVG')}
-            onClick={() => toggleFormat('SVG')}
-          />
-          <FormatOption 
-            icon={<File className="w-4 h-4" />}
-            label="EPS" 
-            description="Vector format"
-            isSelected={isFormatSelected('EPS')}
-            onClick={() => toggleFormat('EPS')}
-          />
-          <FormatOption 
-            icon={<File className="w-4 h-4" />}
-            label="PDF" 
-            description="Vector format"
-            isSelected={isFormatSelected('PDF')}
-            onClick={() => toggleFormat('PDF')}
-          />
-          <FormatOption 
-            icon={<Image className="w-4 h-4" />}
-            label="PNG" 
-            description="Raster format"
-            isSelected={isFormatSelected('PNG')}
-            onClick={() => toggleFormat('PNG')} 
-          />
-        </div>
-      </div>
+      <OutputFormat 
+        selectedFormats={settings.formats}
+        onFormatToggle={toggleFormat}
+      />
 
       {/* Section 3: Resolution (Only when PNG selected) */}
       {isPngSelected() && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold border-b border-border pb-2">Resolution</h3>
-          <RadioGroup 
-            value={settings.resolutions[0]} 
-            onValueChange={(value) => updateSettings('resolutions', [value])}
-            className="space-y-3"
-          >
-            <div className="flex items-center space-x-3">
-              <RadioGroupItem value="72dpi" id="72dpi" />
-              <Label htmlFor="72dpi" className="flex-1">
-                <div className="font-medium">Low (72 dpi)</div>
-                <div className="text-sm text-muted-foreground">Web & on-screen</div>
-              </Label>
-            </div>
-            <div className="flex items-center space-x-3">
-              <RadioGroupItem value="150dpi" id="150dpi" />
-              <Label htmlFor="150dpi" className="flex-1">
-                <div className="font-medium">Medium (150 dpi)</div>
-                <div className="text-sm text-muted-foreground">Social & docs</div>
-              </Label>
-            </div>
-            <div className="flex items-center space-x-3">
-              <RadioGroupItem value="300dpi" id="300dpi" />
-              <Label htmlFor="300dpi" className="flex-1">
-                <div className="font-medium">High (300 dpi)</div>
-                <div className="text-sm text-muted-foreground">Print & signage</div>
-              </Label>
-            </div>
-          </RadioGroup>
-        </div>
+        <ResolutionSelector
+          selectedResolution={settings.resolutions[0]}
+          onResolutionChange={(value) => updateSettings('resolutions', [value])}
+        />
       )}
 
       {/* Section 4: Color Model (Only for PNG, SVG, EPS) */}
       {(isPngSelected() || isVectorSelected()) && (
-        <div className="space-y-6">
-          <h3 className="text-lg font-semibold border-b border-border pb-2">Color Model</h3>
-          
-          {/* Preset Color Options */}
-          <div className="grid grid-cols-2 gap-3">
-            <FormatOption 
-              icon={<Square className="w-4 h-4 fill-black" />}
-              label="Black" 
-              description="Pure black version"
-              isSelected={isColorSelected('Black')}
-              onClick={() => toggleColor('Black')}
-            />
-            <FormatOption 
-              icon={<Square className="w-4 h-4 fill-white stroke-gray-400" />}
-              label="White" 
-              description="Pure white version"
-              isSelected={isColorSelected('White')}
-              onClick={() => toggleColor('White')}
-            />
-            <FormatOption 
-              icon={<CircleDot className="w-4 h-4" />}
-              label="Grayscale" 
-              description="Monochrome applications"
-              isSelected={isColorSelected('Grayscale')}
-              onClick={() => toggleColor('Grayscale')}
-            />
-            <FormatOption 
-              icon={<RotateCcw className="w-4 h-4" />}
-              label="Inverted" 
-              description="Reverse tonal palette"
-              isSelected={isColorSelected('Inverted')}
-              onClick={() => toggleColor('Inverted')}
-            />
-          </div>
-          
-          {/* Custom Color Section */}
-          <div className="mt-8">
-            <h4 className="text-base font-semibold mb-4 flex items-center gap-2">
-              <Palette className="w-4 h-4 text-primary" />
-              Custom Color
-            </h4>
-            
-            <div className="bg-gradient-to-br from-secondary/50 to-secondary/20 border border-border/60 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-4">
-                  <div className="relative group">
-                    <button
-                      onClick={toggleCustomColor}
-                      className={cn(
-                        "relative w-12 h-12 rounded-xl border-2 cursor-pointer transition-all duration-300 group shadow-md hover:shadow-lg",
-                        isColorSelected('Custom') 
-                          ? "border-primary ring-4 ring-primary/20 scale-105" 
-                          : "border-border/50 hover:border-primary/60 hover:scale-105"
-                      )}
-                      style={{ backgroundColor: settings.customColor || '#000000' }}
-                      title={isColorSelected('Custom') ? "Click to unselect custom color" : "Click to select custom color"}
-                    >
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 bg-black/10 rounded-xl backdrop-blur-sm">
-                        <Pipette className="w-4 h-4 text-white drop-shadow-lg" />
-                      </div>
-                    </button>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-foreground/90">
-                      {isColorSelected('Custom') ? 'Selected Color' : 'Custom Color'}
-                    </Label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={settings.customColor || '#000000'}
-                        onChange={(e) => updateSettings('customColor', e.target.value)}
-                        className="w-28 px-3 py-2 text-sm font-mono rounded-lg border border-input bg-background/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all backdrop-blur-sm"
-                        placeholder="#000000"
-                      />
-                      <div className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-md">
-                        HEX
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                {isColorSelected('Custom') && (
-                  <div className="flex items-center gap-2 bg-primary/10 text-primary px-3 py-2 rounded-full text-sm font-medium shadow-sm">
-                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-                    Selected
-                  </div>
-                )}
-              </div>
-              
-              {/* Color Picker Panel */}
-              {showCustomColorPicker && isColorSelected('Custom') && (
-                <div className="mt-6 p-4 bg-background/60 rounded-xl border border-border/30 backdrop-blur-sm animate-fade-in">
-                  <ColorPicker 
-                    value={settings.customColor || '#000000'}
-                    onChange={(color) => updateSettings('customColor', color)}
-                  />
-                </div>
-              )}
-              
-              <div className="mt-4 text-xs text-muted-foreground flex items-center gap-2">
-                <Pipette className="w-3 h-3" />
-                {isColorSelected('Custom') 
-                  ? 'Click the color swatch to unselect or open the picker'
-                  : 'Click the color swatch to select this custom color'
-                }
-              </div>
-            </div>
-          </div>
-        </div>
+        <ColorModelSelector
+          selectedColors={settings.colors}
+          customColor={settings.customColor || '#000000'}
+          onColorToggle={toggleColor}
+          onCustomColorChange={(color) => updateSettings('customColor', color)}
+        />
       )}
 
       {/* Section 5: Background Handling (For raster and vector with transparency) */}
       {(isPngSelected() || isVectorSelected()) && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold border-b border-border pb-2">Background</h3>
-          <RadioGroup 
-            value={settings.backgroundHandling} 
-            onValueChange={(value: 'transparent' | 'remove' | 'replace') => updateSettings('backgroundHandling', value)}
-            className="space-y-3"
-          >
-            <div className="flex items-center space-x-3">
-              <RadioGroupItem value="transparent" id="transparent" />
-              <Label htmlFor="transparent" className="flex-1">
-                <div className="font-medium">Keep Transparency</div>
-                <div className="text-sm text-muted-foreground">Preserve as-is</div>
-              </Label>
-            </div>
-            <div className="flex items-center space-x-3">
-              <RadioGroupItem value="remove" id="remove" />
-              <Label htmlFor="remove" className="flex-1">
-                <div className="font-medium">Remove Background</div>
-                <div className="text-sm text-muted-foreground">Auto-detect & strip</div>
-              </Label>
-            </div>
-            <div className="flex items-center space-x-3">
-              <RadioGroupItem value="replace" id="replace" />
-              <Label htmlFor="replace" className="flex-1">
-                <div className="font-medium">Replace Background</div>
-                <div className="text-sm text-muted-foreground">Apply color/gradient</div>
-              </Label>
-            </div>
-          </RadioGroup>
-          
-          {/* Color picker for background replacement */}
-          {settings.backgroundHandling === 'replace' && (
-            <div className="ml-6 mt-3">
-              <ColorPicker 
-                value={settings.backgroundColor || '#ffffff'}
-                onChange={(color) => updateSettings('backgroundColor', color)}
-              />
-            </div>
-          )}
-        </div>
+        <BackgroundSelector
+          backgroundHandling={settings.backgroundHandling}
+          backgroundColor={settings.backgroundColor || '#ffffff'}
+          onBackgroundHandlingChange={(value) => updateSettings('backgroundHandling', value)}
+          onBackgroundColorChange={(color) => updateSettings('backgroundColor', color)}
+        />
       )}
     </div>
   );
