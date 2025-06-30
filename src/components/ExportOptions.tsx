@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { File, Image, Palette, Sun, Moon, RotateCcw, Square, CircleDot } from 'lucide-react';
+import { File, Image, Palette, Sun, Moon, RotateCcw, Square, CircleDot, Pipette } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import FormatOption from './export/FormatOption';
@@ -194,90 +193,47 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
             />
           </div>
           
-          {/* Custom Color Section - Always Visible */}
+          {/* Custom Color Section */}
           <div className="mt-6">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="text-base font-medium">Custom Color</h4>
-              <FormatOption 
-                icon={<Palette className="w-4 h-4" />}
-                label="Enable" 
-                description=""
-                isSelected={isColorSelected('Custom')}
-                onClick={() => toggleColor('Custom')}
-                className="w-auto px-3 py-2"
-              />
-            </div>
+            <h4 className="text-base font-medium mb-4">Custom Color</h4>
             
-            {/* Always-visible Custom Color Panel */}
             <div className="bg-secondary/20 border border-border/50 rounded-xl p-6 shadow-sm">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Color Picker */}
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium text-foreground">Color Picker</Label>
-                  <div className="relative">
-                    <input
-                      type="color"
-                      value={settings.customColor || '#000000'}
-                      onChange={(e) => updateSettings('customColor', e.target.value)}
-                      className="w-full h-32 rounded-lg border-2 border-border cursor-pointer transition-all hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
-                      style={{ background: 'none' }}
-                    />
-                  </div>
-                </div>
-                
-                {/* Color Inputs */}
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="hex-input" className="text-sm font-medium text-foreground">Hex Color</Label>
-                    <div className="flex items-center space-x-2">
-                      <div 
-                        className="w-10 h-10 rounded-lg border-2 border-border flex-shrink-0 transition-all hover:scale-105"
-                        style={{ backgroundColor: settings.customColor || '#000000' }}
-                      />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => toggleColor('Custom')}
+                      className={cn(
+                        "relative w-12 h-12 rounded-lg border-2 cursor-pointer transition-all duration-200 group",
+                        isColorSelected('Custom') 
+                          ? "border-primary ring-2 ring-primary/20" 
+                          : "border-border hover:border-primary/50"
+                      )}
+                      style={{ backgroundColor: settings.customColor || '#000000' }}
+                      title="Click to select custom color"
+                    >
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Pipette className="w-4 h-4 text-white drop-shadow-lg" />
+                      </div>
+                    </button>
+                    <div className="space-y-1">
+                      <Label className="text-sm font-medium">Click color to select</Label>
                       <input
-                        id="hex-input"
                         type="text"
                         value={settings.customColor || '#000000'}
                         onChange={(e) => updateSettings('customColor', e.target.value)}
-                        className="flex-1 px-3 py-2 rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                        className="w-24 px-2 py-1 text-xs rounded border border-input bg-background focus:outline-none focus:ring-1 focus:ring-ring transition-all"
                         placeholder="#000000"
                       />
                     </div>
                   </div>
-                  
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium text-foreground">RGB Values</Label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {['R', 'G', 'B'].map((channel, index) => {
-                        const hexColor = settings.customColor || '#000000';
-                        const rgb = hexColor.length === 7 ? [
-                          parseInt(hexColor.slice(1, 3), 16),
-                          parseInt(hexColor.slice(3, 5), 16),
-                          parseInt(hexColor.slice(5, 7), 16)
-                        ] : [0, 0, 0];
-                        
-                        return (
-                          <div key={channel} className="space-y-1">
-                            <Label className="text-xs text-muted-foreground">{channel}</Label>
-                            <input
-                              type="number"
-                              min="0"
-                              max="255"
-                              value={rgb[index]}
-                              onChange={(e) => {
-                                const newRgb = [...rgb];
-                                newRgb[index] = parseInt(e.target.value) || 0;
-                                const hex = '#' + newRgb.map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join('');
-                                updateSettings('customColor', hex);
-                              }}
-                              className="w-full px-2 py-1 text-sm rounded border border-input bg-background focus:outline-none focus:ring-1 focus:ring-ring transition-all"
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
                 </div>
+                
+                {isColorSelected('Custom') && (
+                  <div className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
+                    Selected
+                  </div>
+                )}
               </div>
             </div>
           </div>
