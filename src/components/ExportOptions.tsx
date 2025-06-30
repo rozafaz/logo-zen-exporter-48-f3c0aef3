@@ -159,8 +159,10 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
 
       {/* Section 4: Color Model (Only for PNG, SVG, EPS) */}
       {(isPngSelected() || isVectorSelected()) && (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <h3 className="text-lg font-semibold border-b border-border pb-2">Color Model</h3>
+          
+          {/* Preset Color Options */}
           <div className="grid grid-cols-2 gap-3">
             <FormatOption 
               icon={<Square className="w-4 h-4 fill-black" />}
@@ -190,25 +192,95 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
               isSelected={isColorSelected('Inverted')}
               onClick={() => toggleColor('Inverted')}
             />
-            <FormatOption 
-              icon={<Palette className="w-4 h-4" />}
-              label="Custom Color" 
-              description="Choose your own color"
-              isSelected={isColorSelected('Custom')}
-              onClick={() => toggleColor('Custom')}
-            />
           </div>
           
-          {/* Custom Color Picker */}
-          {isColorSelected('Custom') && (
-            <div className="mt-4 p-4 bg-secondary/30 rounded-lg">
-              <h4 className="font-medium mb-3">Custom Color</h4>
-              <ColorPicker 
-                value={settings.customColor || '#000000'}
-                onChange={(color) => updateSettings('customColor', color)}
+          {/* Custom Color Section - Always Visible */}
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-base font-medium">Custom Color</h4>
+              <FormatOption 
+                icon={<Palette className="w-4 h-4" />}
+                label="Enable" 
+                description=""
+                isSelected={isColorSelected('Custom')}
+                onClick={() => toggleColor('Custom')}
+                className="w-auto px-3 py-2"
               />
             </div>
-          )}
+            
+            {/* Always-visible Custom Color Panel */}
+            <div className="bg-secondary/20 border border-border/50 rounded-xl p-6 shadow-sm">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Color Picker */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-foreground">Color Picker</Label>
+                  <div className="relative">
+                    <input
+                      type="color"
+                      value={settings.customColor || '#000000'}
+                      onChange={(e) => updateSettings('customColor', e.target.value)}
+                      className="w-full h-32 rounded-lg border-2 border-border cursor-pointer transition-all hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                      style={{ background: 'none' }}
+                    />
+                  </div>
+                </div>
+                
+                {/* Color Inputs */}
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="hex-input" className="text-sm font-medium text-foreground">Hex Color</Label>
+                    <div className="flex items-center space-x-2">
+                      <div 
+                        className="w-10 h-10 rounded-lg border-2 border-border flex-shrink-0 transition-all hover:scale-105"
+                        style={{ backgroundColor: settings.customColor || '#000000' }}
+                      />
+                      <input
+                        id="hex-input"
+                        type="text"
+                        value={settings.customColor || '#000000'}
+                        onChange={(e) => updateSettings('customColor', e.target.value)}
+                        className="flex-1 px-3 py-2 rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring transition-all"
+                        placeholder="#000000"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-foreground">RGB Values</Label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {['R', 'G', 'B'].map((channel, index) => {
+                        const hexColor = settings.customColor || '#000000';
+                        const rgb = hexColor.length === 7 ? [
+                          parseInt(hexColor.slice(1, 3), 16),
+                          parseInt(hexColor.slice(3, 5), 16),
+                          parseInt(hexColor.slice(5, 7), 16)
+                        ] : [0, 0, 0];
+                        
+                        return (
+                          <div key={channel} className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">{channel}</Label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="255"
+                              value={rgb[index]}
+                              onChange={(e) => {
+                                const newRgb = [...rgb];
+                                newRgb[index] = parseInt(e.target.value) || 0;
+                                const hex = '#' + newRgb.map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join('');
+                                updateSettings('customColor', hex);
+                              }}
+                              className="w-full px-2 py-1 text-sm rounded border border-input bg-background focus:outline-none focus:ring-1 focus:ring-ring transition-all"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

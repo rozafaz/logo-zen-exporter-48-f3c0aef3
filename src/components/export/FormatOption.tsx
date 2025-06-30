@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { Check } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 
 interface FormatOptionProps {
   icon: React.ReactNode;
@@ -9,30 +9,34 @@ interface FormatOptionProps {
   description: string;
   isSelected: boolean;
   onClick: () => void;
+  className?: string;
 }
 
-const FormatOption: React.FC<FormatOptionProps> = ({ 
-  icon, label, description, isSelected, onClick 
+const FormatOption: React.FC<FormatOptionProps> = ({
+  icon, label, description, isSelected, onClick, className
 }) => (
-  <button 
+  <button
     className={cn(
-      "flex items-center p-3 rounded-lg border transition-all",
+      "flex items-center p-3 rounded-lg border transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]",
       isSelected 
-        ? "border-primary bg-primary/5 hover:bg-primary/10"
-        : "border-border hover:border-primary/30 hover:bg-secondary"
+        ? "border-primary bg-primary/5 hover:bg-primary/10 shadow-sm ring-1 ring-primary/20"
+        : "border-border hover:border-primary/30 hover:bg-secondary/50",
+      className
     )}
     onClick={onClick}
   >
-    <div className="mr-3 text-primary">
+    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-secondary/30 mr-3 flex-shrink-0">
       {icon}
     </div>
-    <div className="text-left">
-      <div className="font-medium text-sm flex items-center">
-        {label}
-        {isSelected && <Check className="w-3.5 h-3.5 ml-1.5 text-primary" />}
-      </div>
-      <div className="text-xs text-muted-foreground">{description}</div>
+    <div className="text-left flex-1 min-w-0">
+      <div className="font-medium text-sm truncate">{label}</div>
+      {description && (
+        <div className="text-xs text-muted-foreground truncate">{description}</div>
+      )}
     </div>
+    {isSelected && (
+      <CheckCircle2 className="w-5 h-5 text-primary ml-2 flex-shrink-0" />
+    )}
   </button>
 );
 
