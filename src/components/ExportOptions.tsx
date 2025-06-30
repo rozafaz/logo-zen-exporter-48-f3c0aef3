@@ -14,6 +14,7 @@ export interface ExportSettings {
   brandName: string;
   backgroundHandling: 'transparent' | 'remove' | 'replace';
   backgroundColor?: string;
+  customColor?: string;
 }
 
 interface ExportOptionsProps {
@@ -28,7 +29,8 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
     resolutions: ['300dpi'],
     brandName: 'Brand',
     backgroundHandling: 'transparent',
-    backgroundColor: '#ffffff'
+    backgroundColor: '#ffffff',
+    customColor: '#000000'
   });
 
   const updateSettings = (key: keyof ExportSettings, value: any) => {
@@ -46,8 +48,21 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
     }
   };
 
+  const toggleColor = (color: string) => {
+    const currentColors = settings.colors;
+    if (currentColors.includes(color)) {
+      updateSettings('colors', currentColors.filter(item => item !== color));
+    } else {
+      updateSettings('colors', [...currentColors, color]);
+    }
+  };
+
   const isFormatSelected = (format: string) => {
     return settings.formats.includes(format);
+  };
+
+  const isColorSelected = (color: string) => {
+    return settings.colors.includes(color);
   };
 
   const isPngSelected = () => settings.formats.includes('PNG');
@@ -146,33 +161,61 @@ const ExportOptions: React.FC<ExportOptionsProps> = ({ onChange, className }) =>
       {(isPngSelected() || isVectorSelected()) && (
         <div className="space-y-4">
           <h3 className="text-lg font-semibold border-b border-border pb-2">Color Model</h3>
-          <RadioGroup 
-            value={settings.colors[0]} 
-            onValueChange={(value) => updateSettings('colors', [value])}
-            className="space-y-3"
-          >
-            <div className="flex items-center space-x-3">
-              <RadioGroupItem value="RGB" id="rgb" />
-              <Label htmlFor="rgb" className="flex-1">
-                <div className="font-medium">RGB</div>
-                <div className="text-sm text-muted-foreground">Full-color for screens</div>
-              </Label>
+          <div className="grid grid-cols-2 gap-3">
+            <FormatOption 
+              icon={<Circle className="w-4 h-4" />}
+              label="RGB" 
+              description="Full-color for screens"
+              isSelected={isColorSelected('RGB')}
+              onClick={() => toggleColor('RGB')}
+            />
+            <FormatOption 
+              icon={<Circle className="w-4 h-4" />}
+              label="Grayscale" 
+              description="Monochrome applications"
+              isSelected={isColorSelected('Grayscale')}
+              onClick={() => toggleColor('Grayscale')}
+            />
+            <FormatOption 
+              icon={<Circle className="w-4 h-4" />}
+              label="Inverted" 
+              description="Reverse tonal palette"
+              isSelected={isColorSelected('Inverted')}
+              onClick={() => toggleColor('Inverted')}
+            />
+            <FormatOption 
+              icon={<Circle className="w-4 h-4" />}
+              label="Black" 
+              description="Pure black version"
+              isSelected={isColorSelected('Black')}
+              onClick={() => toggleColor('Black')}
+            />
+            <FormatOption 
+              icon={<Circle className="w-4 h-4" />}
+              label="White" 
+              description="Pure white version"
+              isSelected={isColorSelected('White')}
+              onClick={() => toggleColor('White')}
+            />
+            <FormatOption 
+              icon={<Circle className="w-4 h-4" />}
+              label="Custom Color" 
+              description="Choose your own color"
+              isSelected={isColorSelected('Custom')}
+              onClick={() => toggleColor('Custom')}
+            />
+          </div>
+          
+          {/* Custom Color Picker */}
+          {isColorSelected('Custom') && (
+            <div className="mt-4 p-4 bg-secondary/30 rounded-lg">
+              <h4 className="font-medium mb-3">Custom Color</h4>
+              <ColorPicker 
+                value={settings.customColor || '#000000'}
+                onChange={(color) => updateSettings('customColor', color)}
+              />
             </div>
-            <div className="flex items-center space-x-3">
-              <RadioGroupItem value="Grayscale" id="grayscale" />
-              <Label htmlFor="grayscale" className="flex-1">
-                <div className="font-medium">Grayscale</div>
-                <div className="text-sm text-muted-foreground">Monochrome applications</div>
-              </Label>
-            </div>
-            <div className="flex items-center space-x-3">
-              <RadioGroupItem value="Inverted" id="inverted" />
-              <Label htmlFor="inverted" className="flex-1">
-                <div className="font-medium">Inverted</div>
-                <div className="text-sm text-muted-foreground">Reverse tonal palette</div>
-              </Label>
-            </div>
-          </RadioGroup>
+          )}
         </div>
       )}
 

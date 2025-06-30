@@ -18,7 +18,8 @@ const Index = () => {
     resolutions: ['300dpi'],
     brandName: 'Brand',
     backgroundHandling: 'transparent',
-    backgroundColor: '#ffffff'
+    backgroundColor: '#ffffff',
+    customColor: '#000000'
   });
 
   const handleLogoUpload = (file: File, preview: string) => {
